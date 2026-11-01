@@ -1,0 +1,206 @@
+import { useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
+import { useApp, useTrip } from '../app/AppContext'
+import { BottomNav, ErrorPage, Loading } from '../components/ui'
+import { IconHome, IconPlane, IconPlus, IconTrain } from '../components/Icons'
+import { DestinationSheet } from '../components/DestinationSheet'
+import { MoveBudgetSheet } from '../components/MoveBudgetSheet'
+import { destStats, myShare, totals, type DestStats } from '../lib/calc'
+import { money0, money } from '../lib/format'
+import { dateRange, nights, shortDate } from '../lib/dates'
+import { TRANSPORT, type Destination } from '../lib/types'
+
+export default function Route() {
+  const { tripId } = useParams()
+  const { uid, repo, toast } = useApp()
+  const { data, error, reload } = useTrip(tripId)
+  const [editing, setEditing] = useState<Destination | 'new' | null>(null)
+  const [moveOpen, setMoveOpen] = useState(false)
+
+  if (error) return <ErrorPage message={error} />
+  if (!data || !uid) return <Loading />
+
+  const stats = destStats(data, uid)
+  const tt = totals(data, uid)
+  const isGroup = data.members.length > 1
+  const lastEnd = stats.length ? stats[stats.length - 1].dest.end_date : data.trip.start_date
+  const legCost = (destId: string | null) =>
+    data.expenses.filter((e) => e.category === 'pasajes' && e.destination_id === destId).reduce((a, e) => a + myShare(e, uid), 0)
+  const generalPasajes = legCost(null)
+
+  return (
+    <div className="app">
+      <header className="hero">
+        <div className="hero-top">
+          <Link to="/" className="brand">Worldy</Link>
+        </div>
+        <p className="hero-sub">
+          {data.trip.name} · {dateRange(data.trip.start_date, data.trip.end_date)} · {nights(data.trip.start_date, data.trip.end_date)} noches
+        </p>
+        <h1 className="hero-title" style={{ fontSize: 30 }}>Planifica tu ruta</h1>
+        {isGroup && (
+          <div className="pills">
+            <span className="pill">Ruta compartida con {data.members.length} viajeros · presupuesto personal</span>
+          </div>
+        )}
+      </header>
+
+      <section className="section">
+        <div className="card">
+          <div className="row between baseline">
+            <span className="text13 muted" style={{ fontWeight: 500 }}>Tus pagos fuera del presupuesto</span>
+            <span className="text15 semi">{money0(tt.outsideBudget)}</span>
+          </div>
+          <div className="grid2">
+            <div className="card soft" style={{ padding: '10px 12px', gap: 2 }}>
+              <span className="small bold muted" style={{ letterSpacing: 0.5 }}>PASAJES</span>
+              <span className="text15 semi">{money0(tt.pasajes)}</span>
+            </div>
+            <div className="card soft" style={{ padding: '10px 12px', gap: 2 }}>
+              <span className="small bold muted" style={{ letterSpacing: 0.5 }}>ALOJ. RESERVADO</span>
+              <span className="text15 semi">{money0(tt.lodgingPrepaid)}</span>
+            </div>
+          </div>
+          <div className="row between baseline" style={{ marginTop: 4 }}>
+            <span className="text13 muted" style={{ fontWeight: 500 }}>Tu presupuesto en destino</span>
+            <span className="text15 semi">{money0(tt.budget)}</span>
+          </div>
+          <div className="row between baseline divider">
+            <span className="text14 bold">Tu costo estimado del viaje</span>
+            <span className="text15 semi">{money0(tt.estimated)}</span>
+          </div>
+          {stats.length > 1 && (
+            <button className="link-btn" style={{ alignSelf: 'flex-start', padding: 0 }} onClick={() => setMoveOpen(true)}>
+              Mover presupuesto entre destinos
+            </button>
+          )}
+        </div>
+      </section>
+
+      <section className="section mt-lg" style={{ gap: 0 }}>
+        <div className="row" style={{ padding: '4px 0' }}>
+          <span className="tl-dot" style={{ marginTop: 0 }}><IconHome size={16} /></span>
+          <span className="text14 ink2">
+            Salida desde <strong>{data.trip.origin_city || 'casa'}</strong> · {shortDate(data.trip.start_date)}
+          </span>
+        </div>
+
+        {stats.map((s, i) => (
+          <Stop key={s.dest.id} s={s} index={i} cost={legCost(s.dest.id)} uid={uid} onEdit={() => setEditing(s.dest)} />
+        ))}
+
+        <div className="tl-connector" style={{ minHeight: 28 }}>
+          <div className="tl-line"><div /></div>
+        </div>
+        <div className="row" style={{ alignItems: 'flex-start' }}>
+          <span className="tl-dot" style={{ background: 'transparent', border: '2px dashed #8fae9a', marginTop: 12 }} />
+          <div className="col grow" style={{ gap: 8 }}>
+            <button className="add-dashed" onClick={() => setEditing('new')}>
+              <IconPlus size={18} /> Agregar destino
+            </button>
+            {isGroup && <span className="small muted center">Para todo el grupo o solo para ti</span>}
+          </div>
+        </div>
+        <div className="tl-connector" style={{ minHeight: 28 }}>
+          <div className="tl-line"><div /></div>
+        </div>
+        <div className="row" style={{ padding: '4px 0' }}>
+          <span className="tl-dot" style={{ marginTop: 0 }}><IconHome size={16} /></span>
+          <span className="text14 ink2">
+            Regreso a <strong>{data.trip.origin_city || 'casa'}</strong> · {shortDate(data.trip.end_date)}
+            {generalPasajes > 0 && ` · otros pasajes ${money0(generalPasajes)}`}
+          </span>
+        </div>
+        <p className="small muted" style={{ marginTop: 16 }}>
+          Para registrar un pasaje, agrega un gasto con la categoría Pasajes y elige el destino de llegada.
+        </p>
+      </section>
+
+      {editing && (
+        <DestinationSheet
+          data={data}
+          dest={editing === 'new' ? null : editing}
+          budget={editing === 'new' ? 0 : stats.find((s) => s.dest.id === editing.id)?.budget ?? 0}
+          defaultStart={lastEnd}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null)
+            reload()
+          }}
+        />
+      )}
+      {moveOpen && (
+        <MoveBudgetSheet
+          stats={stats}
+          onClose={() => setMoveOpen(false)}
+          onMove={async (fromId, amount, toId) => {
+            setMoveOpen(false)
+            try {
+              await repo.moveBudget(data.trip.id, fromId, toId, amount)
+              toast('Presupuesto actualizado')
+              reload()
+            } catch (e) {
+              toast(e instanceof Error ? e.message : 'No se pudo mover')
+            }
+          }}
+        />
+      )}
+      <BottomNav tripId={data.trip.id} active="ruta" />
+    </div>
+  )
+}
+
+function Stop({ s, index, cost, uid, onEdit }: { s: DestStats; index: number; cost: number; uid: string; onEdit: () => void }) {
+  const mode = TRANSPORT.find((t) => t.id === s.dest.transport_mode)?.label ?? 'Traslado'
+  const cls = s.status === 'current' ? 'current' : s.status === 'past' ? 'past' : ''
+  return (
+    <>
+      <div className="tl-connector">
+        <div className="tl-line"><div /></div>
+        <span className="tl-chip">
+          {s.dest.transport_mode === 'tren' ? <IconTrain /> : <IconPlane />}
+          {mode}
+          {cost > 0 && ` · ${money0(cost)}`}
+        </span>
+      </div>
+      <div className="tl-stop">
+        <span className={`tl-dot ${s.status === 'current' ? 'current' : ''}`}>{index + 1}</span>
+        <button type="button" className={`tl-card ${cls}`} onClick={onEdit}>
+          <div className="row between" style={{ width: '100%' }}>
+            <span className="tl-city" style={s.status === 'past' ? { color: 'var(--ink-2)' } : undefined}>
+              {s.dest.city}
+              {s.dest.owner_id === uid && (
+                <span className="tag" style={{ marginLeft: 6, verticalAlign: 'middle', fontFamily: 'var(--body)' }}>SOLO TÚ</span>
+              )}
+            </span>
+            {s.status === 'past' ? (
+              <span className="small bold muted">VISITADO</span>
+            ) : s.status === 'current' ? (
+              <span className="small bold amber">ESTÁS AQUÍ</span>
+            ) : (
+              <span className="text15 semi">{money0(s.budget)}</span>
+            )}
+          </div>
+          <span className={`text13 ${s.status === 'current' ? '' : 'muted'}`} style={s.status === 'current' ? { color: 'var(--brown-2)' } : undefined}>
+            {[s.dest.country, dateRange(s.dest.start_date, s.dest.end_date), `${s.days} ${s.days === 1 ? 'noche' : 'noches'}`].filter(Boolean).join(' · ')}
+          </span>
+          {s.lodgingPrepaid > 0 ? (
+            <span className="text13 ink2">Alojamiento reservado {money0(s.lodgingPrepaid)}</span>
+          ) : s.status === 'upcoming' && s.lodgingTotal === 0 ? (
+            <span className="text13 amber">Alojamiento sin reservar · se paga allá, dentro del presupuesto</span>
+          ) : null}
+          {s.status !== 'upcoming' && (
+            <span className="text13 ink2">
+              En destino {money(s.spent)} de {money0(s.budget)}
+              {s.status === 'past' && s.left > 0 && (
+                <>
+                  {' · '}sobraron <strong className="green-text semi">{money0(s.left)}</strong>
+                </>
+              )}
+            </span>
+          )}
+        </button>
+      </div>
+    </>
+  )
+}
