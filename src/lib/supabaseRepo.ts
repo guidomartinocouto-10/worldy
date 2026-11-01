@@ -182,7 +182,12 @@ export function createSupabaseRepo(url: string, anonKey: string): Repo {
       const { shares, ...row } = e
       const created = check(await sb.from('expenses').insert({ ...row, created_by: id }).select().single()) as Expense
       const finalShares = shares.length ? shares : [{ user_id: id, share_usd: e.amount_usd }]
-      check(await sb.from('expense_shares').insert(finalShares.map((s) => ({ ...s, expense_id: created.id }))))
+      const res = await sb.from('expense_shares').insert(finalShares.map((s) => ({ ...s, expense_id: created.id })))
+      if (res.error) {
+        // Si no se pudieron guardar las partes, se deshace el gasto para no dejarlo incompleto
+        await sb.from('expenses').delete().eq('id', created.id)
+        throw new Error(res.error.message)
+      }
     },
 
     async deleteExpense(expenseId) {
