@@ -1,7 +1,8 @@
 import { useEffect, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { IconClose, IconHome, IconPlus, IconReceipt, IconRoute, IconUsers } from './Icons'
+import { IconBack, IconChart, IconClose, IconHome, IconPlus, IconReceipt, IconRoute, IconUsers } from './Icons'
 import { initials, num, symbol } from '../lib/format'
+import { useCountUp } from './Travel'
 import type { Profile } from '../lib/types'
 
 export function BottomNav({ tripId, active }: { tripId: string; active: 'inicio' | 'ruta' | 'gastos' | 'grupo' | null }) {
@@ -13,13 +14,26 @@ export function BottomNav({ tripId, active }: { tripId: string; active: 'inicio'
   )
   return (
     <nav className="bottom-nav" aria-label="Navegación del viaje">
+      <Link to="/" className="nav-brand">
+        <img src="/pwa-192.png" alt="" />
+        Worldy
+      </Link>
       {item('inicio', `/v/${tripId}`, 'Inicio', <IconHome />)}
       {item('ruta', `/v/${tripId}/ruta`, 'Ruta', <IconRoute />)}
       <Link to={`/v/${tripId}/gasto`} className="nav-add" aria-label="Agregar gasto">
         <IconPlus />
+        <span className="nav-add-label">Agregar gasto</span>
       </Link>
       {item('gastos', `/v/${tripId}/gastos`, 'Gastos', <IconReceipt />)}
       {item('grupo', `/v/${tripId}/grupo`, 'Grupo', <IconUsers />)}
+      <Link to={`/v/${tripId}/resumen`} className="nav-item nav-extra">
+        <IconChart />
+        Resumen
+      </Link>
+      <Link to="/" className="nav-item nav-extra" style={{ marginTop: 0 }}>
+        <IconBack size={22} />
+        Mis viajes
+      </Link>
     </nav>
   )
 }
@@ -27,10 +41,11 @@ export function BottomNav({ tripId, active }: { tripId: string; active: 'inicio'
 /** Monto grande con el símbolo pequeño: <sup>US$</sup>1.295 */
 export function HeroAmount({ value, currency = 'USD', decimals, size }: { value: number; currency?: string; decimals?: 0 | 2; size?: number }) {
   const d = decimals ?? (Math.abs(value) >= 1000 ? 0 : 2)
+  const shown = useCountUp(value)
   return (
     <span className="amount-hero" style={size ? { fontSize: size } : undefined}>
       <span className="cur">{symbol(currency)}</span>
-      {num(value, d)}
+      {num(shown, d)}
     </span>
   )
 }

@@ -61,6 +61,7 @@ export function AppProvider({ repo, children }: { repo: Repo; children: ReactNod
       {children}
       {toastMsg && (
         <div className="toast" role="status">
+          <span style={{ width: 22, height: 22, borderRadius: 11, background: 'var(--yellow)', color: 'var(--ink)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0 }} aria-hidden="true">✓</span>
           {toastMsg}
         </div>
       )}

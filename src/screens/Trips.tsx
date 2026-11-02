@@ -7,7 +7,8 @@ import { money0 } from '../lib/format'
 import { dateRange, daysBetween, todayISO } from '../lib/dates'
 import { Avatar, Bar, Loading, Sheet } from '../components/ui'
 import { IconPlus } from '../components/Icons'
-import { firstName } from '../lib/format'
+import { HeroDecor, SuitcaseArt } from '../components/Illustrations'
+import { Stamp, greeting } from '../components/Travel'
 
 export default function Trips() {
   const { repo, uid, profile, toast } = useApp()
@@ -53,19 +54,18 @@ export default function Trips() {
       </header>
       <div style={{ padding: '8px 20px 0' }}>
         <p className="text14 muted" style={{ margin: 0 }}>
-          Hola{profile?.name && profile.name !== 'Tú' ? `, ${firstName(profile.name)}` : ''}
+          {greeting(profile?.name)}
         </p>
         <h1 className="hero-title">Mis viajes</h1>
       </div>
 
       {trips.length === 0 && (
         <div className="section">
-          <div className="card soft center">
-            <p className="text15" style={{ margin: 0 }}>
-              Todavía no tienes viajes.
-            </p>
-            <p className="text13 muted" style={{ margin: 0 }}>
-              Crea uno nuevo o únete al de tus amigos con su código.
+          <div className="card empty-art">
+            <SuitcaseArt />
+            <p className="tl-city" style={{ fontSize: 20 }}>¿A dónde vamos?</p>
+            <p className="text14 muted" style={{ maxWidth: 280 }}>
+              Crea tu primer viaje o únete al de tus amigos con su código de invitación.
             </p>
           </div>
         </div>
@@ -78,7 +78,8 @@ export default function Trips() {
             const tt = totals(t, uid)
             const cur = destStats(t, uid).find((s) => s.status === 'current')
             return (
-              <Link key={t.trip.id} to={`/v/${t.trip.id}`} className="card" style={{ background: 'var(--green)', color: '#fff', border: 'none', textDecoration: 'none' }}>
+              <Link key={t.trip.id} to={`/v/${t.trip.id}`} className="card hero" style={{ background: 'var(--green)', color: '#fff', border: 'none', textDecoration: 'none', borderRadius: 22, padding: 20, gap: 12 }}>
+                <HeroDecor />
                 <div className="row between" style={{ alignItems: 'flex-start' }}>
                   <div className="col">
                     <span className="tl-city" style={{ fontSize: 24 }}>{t.trip.name}</span>
@@ -171,6 +172,13 @@ function TripRow({ t, uid, past }: { t: TripData; uid: string; past?: boolean })
         </div>
       </div>
       {!past && tt.budget > 0 && <Bar pct={tt.budget ? tt.spentInBudget / tt.budget : 0} thin />}
+      {past && t.destinations.length > 0 && (
+        <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+          {t.destinations.slice(0, 6).map((d, i) => (
+            <Stamp key={d.id} city={d.city} size={46} tilt={[-10, 6, -4, 9, -7, 3][i]} tone={i % 2 ? 'amber' : 'green'} />
+          ))}
+        </div>
+      )}
     </Link>
   )
 }

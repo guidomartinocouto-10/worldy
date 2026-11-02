@@ -4,6 +4,7 @@ import { useApp, useTrip } from '../app/AppContext'
 import { BottomNav, ErrorPage, Loading, Sheet, Bar } from '../components/ui'
 import { IconSearch, IconSwap } from '../components/Icons'
 import { ExpenseRow } from '../components/ExpenseRow'
+import { HeroDecor, ReceiptArt } from '../components/Illustrations'
 import { ExpenseSheet } from '../components/ExpenseSheet'
 import { myRoute, myShare, totals, wallets } from '../lib/calc'
 import { CATEGORIES, categoryLabel, type Expense, type Purchase } from '../lib/types'
@@ -76,7 +77,9 @@ export default function Expenses() {
 
   return (
     <div className="app">
+      <main className="page">
       <header className="hero">
+        <HeroDecor />
         <div className="hero-top">
           <Link to="/" className="brand">Worldy</Link>
         </div>
@@ -96,6 +99,8 @@ export default function Expenses() {
         </div>
       </header>
 
+      <div className="desk-grid narrow-left">
+      <div className="desk-col sticky">
       <section className="section">
         <label className="sr-only" htmlFor="buscar">Buscar gasto</label>
         <div className="input row" style={{ height: 48, borderColor: 'var(--line)', gap: 10 }}>
@@ -136,6 +141,8 @@ export default function Expenses() {
         </section>
       ))}
 
+      </div>
+      <div className="desk-col">
       {view === 'day' &&
         groupKeys.map((k) => {
           const items = groups.get(k)!
@@ -185,7 +192,17 @@ export default function Expenses() {
         </section>
       )}
 
-      {view === 'day' && groupKeys.length === 0 && <div className="empty">No hay gastos con estos filtros.</div>}
+      {view === 'day' && groupKeys.length === 0 && (
+        <section className="section">
+          <div className="card empty-art">
+            <ReceiptArt size={110} />
+            <span className="text14 muted">{data.expenses.length ? 'No hay gastos con estos filtros.' : 'Todavía no hay gastos. Usa el botón + para cargar el primero.'}</span>
+          </div>
+        </section>
+      )}
+
+      </div>
+      </div>
 
       {openExpense && (
         <ExpenseSheet e={openExpense} data={data} onClose={() => setOpenExpense(null)} onChanged={() => { setOpenExpense(null); reload() }} />
@@ -201,6 +218,7 @@ export default function Expenses() {
           <button className="btn danger block" onClick={() => delPurchase(openPurchase)}>Eliminar compra</button>
         </Sheet>
       )}
+      </main>
       <BottomNav tripId={data.trip.id} active="gastos" />
     </div>
   )

@@ -4,7 +4,7 @@ import { useApp, useTrip } from '../app/AppContext'
 import { Avatar, ErrorPage, Loading, Switch } from '../components/ui'
 import { IconClose } from '../components/Icons'
 import { CATEGORIES, type CategoryId, type TripData } from '../lib/types'
-import { myRoute, splitEqual, wallets } from '../lib/calc'
+import { destStats, myRoute, splitEqual, wallets } from '../lib/calc'
 import { allCurrencies, currencyName, fromUSD, toUSD } from '../lib/fx'
 import { firstName, money, num, parseAmount, round2, symbol } from '../lib/format'
 import { todayISO } from '../lib/dates'
@@ -129,7 +129,11 @@ function ExpenseForm({ data, uid }: { data: TripData; uid: string }) {
         spent_on: date,
         shares,
       })
-      toast('Gasto guardado')
+      const st = destId && !outOfBudget ? destStats(data, uid).find((x) => x.dest.id === destId) : null
+      if (st && st.budget > 0) {
+        const left = st.left - myPart
+        toast(left >= 0 ? `¡Listo! Te quedan ${money(left)} en ${st.dest.city}` : `Guardado. Te pasaste ${money(-left)} en ${st.dest.city}`)
+      } else toast('¡Listo! Gasto guardado')
       nav(`/v/${data.trip.id}`)
     } catch (e) {
       toast(e instanceof Error ? e.message : 'No se pudo guardar')

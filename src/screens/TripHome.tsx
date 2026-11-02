@@ -2,14 +2,16 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useApp, useTrip } from '../app/AppContext'
 import { BottomNav, Bar, ErrorPage, HeroAmount, Loading } from '../components/ui'
-import { IconAlert } from '../components/Icons'
+import { IconAlert, IconCheck } from '../components/Icons'
+import { HeroDecor, MapArt, ReceiptArt } from '../components/Illustrations'
+import { BoardingPass, Stamp, greeting } from '../components/Travel'
 import { ExpenseRow } from '../components/ExpenseRow'
 import { MoveBudgetSheet } from '../components/MoveBudgetSheet'
 import { ExpenseSheet } from '../components/ExpenseSheet'
 import { currentAlert, destStats, myShare, totals } from '../lib/calc'
 import { fromUSD } from '../lib/fx'
 import { money, money0, initials } from '../lib/format'
-import { dateRange, daysBetween, todayISO } from '../lib/dates'
+import { dateRange, daysBetween, shortDate, todayISO } from '../lib/dates'
 import type { Expense } from '../lib/types'
 
 export default function TripHome() {
@@ -52,14 +54,17 @@ export default function TripHome() {
 
   return (
     <div className="app">
+      <main className="page">
       <header className="hero overlap">
+        <HeroDecor />
         <div className="hero-top">
           <Link to="/" className="brand">Worldy</Link>
           <Link to="/perfil" className="avatar-btn" aria-label="Mi perfil">
             {profile?.avatar_url ? <img src={profile.avatar_url} alt="" referrerPolicy="no-referrer" /> : initials(profile?.name ?? '?')}
           </Link>
         </div>
-        <p className="hero-sub">
+        <p className="greeting">{greeting(profile?.name)}</p>
+        <p className="hero-sub" style={{ marginTop: 2 }}>
           {dateRange(data.trip.start_date, data.trip.end_date)} · {data.members.length === 1 ? 'individual' : `${data.members.length} viajeros`}
         </p>
         <h1 className="hero-title">{data.trip.name}</h1>
@@ -71,6 +76,8 @@ export default function TripHome() {
         </div>
       </header>
 
+      <div className="desk-grid">
+      <div className="desk-col sticky">
       <section className="section" style={{ marginTop: 0 }}>
         <div className="card raised">
           <span className="text13 muted" style={{ fontWeight: 500 }}>Tu presupuesto en destino</span>
@@ -141,6 +148,22 @@ export default function TripHome() {
         </section>
       )}
 
+      </div>
+      <div className="desk-col">
+      {!alert && current && current.budget > 0 && current.pct <= current.dayIndex / current.days && (
+        <section className="section">
+          <div className="cheer">
+            <div className="ico"><IconCheck /></div>
+            <div className="col">
+              <strong className="text15">¡Vas muy bien en {current.dest.city}!</strong>
+              <span className="text13" style={{ color: 'var(--green-mid)' }}>
+                Usaste el {Math.round(current.pct * 100)} % del presupuesto y llevas {current.dayIndex} de {current.days} días.
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="section mt-lg">
         <div className="section-head">
           <h2 className="h2">Tu ruta</h2>
@@ -150,8 +173,10 @@ export default function TripHome() {
         </div>
 
         {stats.length === 0 && (
-          <div className="card soft center">
-            <span className="text14">Agrega los destinos de tu viaje y su presupuesto.</span>
+          <div className="card empty-art">
+            <MapArt />
+            <p className="tl-city" style={{ fontSize: 19 }}>Tu mapa está en blanco</p>
+            <span className="text14 muted">Agrega los destinos de tu viaje y cuánto planeas gastar en cada uno.</span>
             <Link to={`/v/${data.trip.id}/ruta`} className="btn primary small">
               Armar la ruta
             </Link>
@@ -166,9 +191,12 @@ export default function TripHome() {
                 {dateRange(current.dest.start_date, current.dest.end_date)} · día {current.dayIndex} de {current.days}
               </span>
             </div>
-            <div className="row baseline" style={{ gap: 8 }}>
-              <span className="tl-city" style={{ fontSize: 28 }}>{current.dest.city}</span>
-              <span className="text14 muted">{current.dest.country}</span>
+            <div className="row between">
+              <div className="col">
+                <span className="tl-city" style={{ fontSize: 28 }}>{current.dest.city}</span>
+                <span className="text14 muted">{current.dest.country}</span>
+              </div>
+              <span className="stamp-pop"><Stamp city={current.dest.city} label="Llegada" date={shortDate(current.dest.start_date)} tone="amber" size={68} /></span>
             </div>
             <Bar pct={current.pct} variant={current.pct > 1 ? 'over' : 'warn'} />
             <div className="row between text13">
@@ -180,6 +208,10 @@ export default function TripHome() {
               </span>
             </div>
           </div>
+        )}
+
+        {upcoming.length > 0 && (current || !started) && (
+          <BoardingPass from={current?.dest ?? null} to={upcoming[0].dest} budget={upcoming[0].budget} />
         )}
 
         {upcoming.length > 0 && (
@@ -230,7 +262,12 @@ export default function TripHome() {
             </Link>
           )}
         </div>
-        {recent.length === 0 && <div className="empty">Aún no registraste gastos durante el viaje. Usa el botón + para agregar uno.</div>}
+        {recent.length === 0 && (
+          <div className="card empty-art">
+            <ReceiptArt size={110} />
+            <span className="text14 muted">Aún no registraste gastos durante el viaje. Usa el botón + para agregar el primero.</span>
+          </div>
+        )}
         {recent.map((e) => (
           <ExpenseRow key={e.id} e={e} data={data} uid={uid} onClick={() => setOpenExpense(e)} />
         ))}
@@ -246,6 +283,9 @@ export default function TripHome() {
         )}
       </section>
 
+      </div>
+      </div>
+
       {moveOpen && current && (
         <MoveBudgetSheet
           stats={stats}
@@ -260,6 +300,7 @@ export default function TripHome() {
       {openExpense && (
         <ExpenseSheet e={openExpense} data={data} onClose={() => setOpenExpense(null)} onChanged={() => { setOpenExpense(null); reload() }} />
       )}
+      </main>
       <BottomNav tripId={data.trip.id} active="inicio" />
     </div>
   )

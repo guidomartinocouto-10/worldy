@@ -4,6 +4,8 @@ import { useApp, useTrip } from '../app/AppContext'
 import { BottomNav, ErrorPage, Loading } from '../components/ui'
 import { IconHome, IconPlane, IconPlus, IconTrain } from '../components/Icons'
 import { DestinationSheet } from '../components/DestinationSheet'
+import { HeroDecor, MapArt } from '../components/Illustrations'
+import { Stamp } from '../components/Travel'
 import { MoveBudgetSheet } from '../components/MoveBudgetSheet'
 import { destStats, myShare, totals, type DestStats } from '../lib/calc'
 import { money0, money } from '../lib/format'
@@ -30,7 +32,9 @@ export default function Route() {
 
   return (
     <div className="app">
+      <main className="page">
       <header className="hero">
+        <HeroDecor />
         <div className="hero-top">
           <Link to="/" className="brand">Worldy</Link>
         </div>
@@ -45,6 +49,8 @@ export default function Route() {
         )}
       </header>
 
+      <div className="desk-grid narrow-left">
+      <div className="desk-col sticky">
       <section className="section">
         <div className="card">
           <div className="row between baseline">
@@ -77,6 +83,8 @@ export default function Route() {
         </div>
       </section>
 
+      </div>
+      <div className="desk-col">
       <section className="section mt-lg" style={{ gap: 0 }}>
         <div className="row" style={{ padding: '4px 0' }}>
           <span className="tl-dot" style={{ marginTop: 0 }}><IconHome size={16} /></span>
@@ -85,6 +93,12 @@ export default function Route() {
           </span>
         </div>
 
+        {stats.length === 0 && (
+          <div className="card empty-art" style={{ margin: '16px 0 0 44px' }}>
+            <MapArt size={130} />
+            <span className="text14 muted">Agrega tu primer destino: ciudad, fechas y cuánto planeas gastar allí.</span>
+          </div>
+        )}
         {stats.map((s, i) => (
           <Stop key={s.dest.id} s={s} index={i} cost={legCost(s.dest.id)} uid={uid} onEdit={() => setEditing(s.dest)} />
         ))}
@@ -116,6 +130,9 @@ export default function Route() {
         </p>
       </section>
 
+      </div>
+      </div>
+
       {editing && (
         <DestinationSheet
           data={data}
@@ -145,6 +162,7 @@ export default function Route() {
           }}
         />
       )}
+      </main>
       <BottomNav tripId={data.trip.id} active="ruta" />
     </div>
   )
@@ -166,7 +184,7 @@ function Stop({ s, index, cost, uid, onEdit }: { s: DestStats; index: number; co
       <div className="tl-stop">
         <span className={`tl-dot ${s.status === 'current' ? 'current' : ''}`}>{index + 1}</span>
         <button type="button" className={`tl-card ${cls}`} onClick={onEdit}>
-          <div className="row between" style={{ width: '100%' }}>
+          <div className="row between" style={{ width: '100%', alignItems: 'flex-start' }}>
             <span className="tl-city" style={s.status === 'past' ? { color: 'var(--ink-2)' } : undefined}>
               {s.dest.city}
               {s.dest.owner_id === uid && (
@@ -174,7 +192,7 @@ function Stop({ s, index, cost, uid, onEdit }: { s: DestStats; index: number; co
               )}
             </span>
             {s.status === 'past' ? (
-              <span className="small bold muted">VISITADO</span>
+              <span className="stamp-pop"><Stamp city={s.dest.city} label="Visitado" size={58} tilt={-12} /></span>
             ) : s.status === 'current' ? (
               <span className="small bold amber">ESTÁS AQUÍ</span>
             ) : (

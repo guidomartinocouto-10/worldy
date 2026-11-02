@@ -1,12 +1,14 @@
 import { Link, useParams } from 'react-router-dom'
 import { useApp, useTrip } from '../app/AppContext'
 import { Bar, ErrorPage, HeroAmount, Loading } from '../components/ui'
-import { IconBack, IconCheck } from '../components/Icons'
+import { IconBack } from '../components/Icons'
+import { Confetti, HeroDecor, MedalArt } from '../components/Illustrations'
+import { Stamp } from '../components/Travel'
 import { byCategory, destStats, isPrepaid, myShare, totals } from '../lib/calc'
 import { categoryLabel, type TripData } from '../lib/types'
 import { money0, num } from '../lib/format'
 import { fromUSD } from '../lib/fx'
-import { dateRange, nights, todayISO } from '../lib/dates'
+import { dateRange, nights, shortDate, todayISO } from '../lib/dates'
 
 export default function Summary() {
   const { tripId } = useParams()
@@ -28,8 +30,11 @@ export default function Summary() {
   const pct = (v: number) => (tt.total > 0 ? Math.round((v / tt.total) * 100) : 0)
 
   return (
-    <div className="app no-nav">
+    <div className="app no-nav wide">
+      <main className="page">
+      {ended && diff > 1 && <Confetti />}
       <header className="hero">
+        <HeroDecor />
         <div className="hero-top">
           <Link to={`/v/${data.trip.id}`} className="icon-btn" aria-label="Volver"><IconBack /></Link>
           <button className="icon-btn" aria-label="Descargar planilla" onClick={() => exportCsv(data, uid)} style={{ width: 'auto', padding: '0 14px', fontSize: 13, fontWeight: 700 }}>
@@ -55,7 +60,7 @@ export default function Summary() {
       {ended && tt.estimated > 0 && (
         <section className="section">
           <div className="card green" style={{ flexDirection: 'row', alignItems: 'center', padding: '14px 16px' }}>
-            <div className="ico" style={{ background: 'var(--green)', color: '#fff' }}><IconCheck /></div>
+            <MedalArt />
             <div className="col">
               <strong className="text15" style={{ color: 'var(--green-dark)' }}>
                 {Math.abs(diff) < 1 ? 'Justo lo planeado' : diff > 0 ? `${money0(diff)} por debajo de lo planeado` : `${money0(-diff)} por encima de lo planeado`}
@@ -68,6 +73,26 @@ export default function Summary() {
         </section>
       )}
 
+      {stats.length > 0 && (
+        <section className="section mt-lg">
+          <div className="card" style={{ background: 'var(--yellow-card)', borderColor: 'var(--yellow-line)' }}>
+            <div className="row between baseline">
+              <h2 className="h2" style={{ fontSize: 19 }}>Tu pasaporte</h2>
+              <span className="text13 muted">{stats.filter((s) => s.status === 'past').length} de {stats.length} visitados</span>
+            </div>
+            <div className="row" style={{ flexWrap: 'wrap', gap: 10, justifyContent: 'center', padding: '6px 0' }}>
+              {stats.map((s, i) => (
+                <span key={s.dest.id} className="stamp-pop" style={{ animationDelay: `${0.15 + i * 0.12}s`, opacity: s.status === 'upcoming' ? 0.35 : 1 }}>
+                  <Stamp city={s.dest.city} label={s.dest.country.slice(0, 12) || 'Destino'} date={shortDate(s.dest.start_date)} size={78} tilt={[-9, 7, -4, 10, -12, 5, -6, 8][i % 8]} tone={i % 2 ? 'amber' : 'green'} />
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <div className="desk-grid">
+      <div className="desk-col">
       <section className="section mt-lg">
         <div className="card">
           <h2 className="h2" style={{ fontSize: 19 }}>En qué se fue</h2>
@@ -117,7 +142,9 @@ export default function Summary() {
         </div>
       </section>
 
-      <section className="section">
+      </div>
+      <div className="desk-col">
+      <section className="section mt-lg">
         <div className="card" style={{ gap: 4 }}>
           <div className="row between baseline" style={{ marginBottom: 6 }}>
             <h2 className="h2" style={{ fontSize: 19 }}>Por destino</h2>
@@ -144,6 +171,9 @@ export default function Summary() {
       <div className="section mt-lg">
         <Link to={`/v/${data.trip.id}/grupo`} className="btn primary block">Ver cuentas del grupo</Link>
       </div>
+      </div>
+      </div>
+      </main>
     </div>
   )
 }

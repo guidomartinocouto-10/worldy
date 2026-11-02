@@ -16,7 +16,7 @@ export function ExpenseRow({ e, data, uid, onClick }: { e: Expense; data: TripDa
   ]
   return (
     <button type="button" className="tile" onClick={onClick}>
-      <div className="ico">
+      <div className={`ico cat-${e.category}`}>
         <CategoryIcon id={e.category} />
       </div>
       <div className="col grow">

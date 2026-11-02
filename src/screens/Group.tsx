@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useApp, useTrip } from '../app/AppContext'
 import { Avatar, BottomNav, ErrorPage, Loading, Sheet } from '../components/ui'
 import { InviteCard } from '../components/InviteCard'
+import { FriendsArt, HeroDecor } from '../components/Illustrations'
 import { ExpenseSheet } from '../components/ExpenseSheet'
 import { balancesWith, myShare } from '../lib/calc'
 import { firstName, money, num, parseAmount } from '../lib/format'
@@ -53,7 +54,9 @@ export default function Group() {
 
   return (
     <div className="app">
+      <main className="page">
       <header className="hero">
+        <HeroDecor />
         <div className="hero-top">
           <Link to="/" className="brand">Worldy</Link>
         </div>
@@ -82,13 +85,15 @@ export default function Group() {
       {others.length === 0 ? (
         <section className="section">
           <div className="card">
+            <div className="empty-art" style={{ padding: 0 }}><FriendsArt /></div>
             <span className="text15 bold">Invita a tus compañeros</span>
             <span className="text13 muted">Comparte el código para que se unan al viaje. Cada uno carga sus gastos y define su presupuesto.</span>
             <InviteCard trip={data.trip} />
           </div>
         </section>
       ) : (
-        <>
+        <div className="desk-grid">
+          <div className="desk-col">
           <section className="section">
             <h2 className="h2">Saldos</h2>
             <div className="card tight">
@@ -110,6 +115,12 @@ export default function Group() {
             </button>
           </section>
 
+          <section className="section mt-lg">
+            <h2 className="h2">Invitar a más viajeros</h2>
+            <InviteCard trip={data.trip} />
+          </section>
+          </div>
+          <div className="desk-col">
           <section className="section mt-lg" style={{ gap: 8 }}>
             <h2 className="h2" style={{ marginBottom: 4 }}>Gastos divididos</h2>
             {shared.length === 0 && <div className="empty">Todavía no hay gastos divididos. Al cargar un gasto, activa “Dividir gasto”.</div>}
@@ -136,11 +147,8 @@ export default function Group() {
             })}
           </section>
 
-          <section className="section mt-lg">
-            <h2 className="h2">Invitar a más viajeros</h2>
-            <InviteCard trip={data.trip} />
-          </section>
-        </>
+          </div>
+        </div>
       )}
 
       {payOpen && (
@@ -165,6 +173,7 @@ export default function Group() {
       {openExpense && (
         <ExpenseSheet e={openExpense} data={data} onClose={() => setOpenExpense(null)} onChanged={() => { setOpenExpense(null); reload() }} />
       )}
+      </main>
       <BottomNav tripId={data.trip.id} active="grupo" />
     </div>
   )
