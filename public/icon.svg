@@ -1,9 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <clipPath id="globo"><circle cx="256" cy="222" r="84"/></clipPath>
+  </defs>
   <rect width="512" height="512" rx="112" fill="#1F4D3A"/>
-  <g fill="none" stroke="#F6D776" stroke-width="22" stroke-linecap="round">
-    <circle cx="256" cy="256" r="150"/>
-    <ellipse cx="256" cy="256" rx="64" ry="150"/>
-    <path d="M114 206h284M114 306h284"/>
+  <path d="M256 74c-86 0-152 65-152 148 0 108 152 222 152 222s152-114 152-222c0-83-66-148-152-148z" fill="#F6D776"/>
+  <circle cx="256" cy="222" r="84" fill="#1F4D3A"/>
+  <g clip-path="url(#globo)" fill="#F6D776">
+    <!-- América del Norte -->
+    <path d="M146 150c18-18 60-24 94-14 13 4 16 14 9 22-6 7-10 16-17 26-6 9-11 19-16 28-3 5-8 6-12 2-6-6-13-9-21-14-9-6-14-15-21-22-8-8-20-14-16-28z"/>
+    <!-- Groenlandia -->
+    <path d="M250 140c8-6 22-5 26 2 3 6-4 12-12 14-9 2-19-1-18-7 0-4 1-7 4-9z"/>
+    <!-- América Central y del Sur -->
+    <path d="M214 214c6-1 10 3 15 6 10 2 22 4 28 13 6 9 2 20-2 30-4 11-10 22-16 33-4 8-8 16-14 20-4-6-4-15-5-23-1-12-4-23-8-34-3-9-8-17-6-27 1-8 3-14 8-18z"/>
+    <!-- Europa -->
+    <path d="M286 160c8-7 20-8 30-4 7 3 13 9 11 15-2 5-9 6-14 9-6 3-10 9-17 9-7 0-12-6-13-12-1-7-2-12 3-17z"/>
+    <!-- África -->
+    <path d="M284 196c12-6 28-5 38 3 9 7 12 18 10 28-2 11-10 19-14 29-5 11-6 23-14 31-5 5-11 5-14-1-4-9-2-19-6-28-3-8-11-13-14-21-4-11-2-26 7-35 2-2 4-4 7-6z"/>
   </g>
-  <circle cx="370" cy="146" r="34" fill="#FBF8F3"/>
+  <path d="M190 268a84 84 0 0 0 112 22" fill="none" stroke="#2F5A47" stroke-width="10" stroke-linecap="round" clip-path="url(#globo)"/>
+  <circle cx="256" cy="222" r="84" fill="none" stroke="#1F4D3A" stroke-width="6"/>
 </svg>
