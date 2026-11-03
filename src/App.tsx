@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { useApp } from './app/AppContext'
 import { Loading } from './components/ui'
+import { SyncBanner } from './components/SyncBanner'
 import Login from './screens/Login'
 import Trips from './screens/Trips'
 import TripHome from './screens/TripHome'
@@ -54,6 +55,7 @@ export default function App() {
   return (
     <BrowserRouter>
       {repo.mode === 'demo' && <div className="demo-banner">Modo demo · los datos se guardan solo en este dispositivo</div>}
+      <SyncBanner />
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route path="/" element={<Trips />} />

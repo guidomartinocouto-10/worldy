@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { Repo } from '../lib/repo'
 import type { Profile, TripData } from '../lib/types'
 import { fetchRates, loadCachedRates, type FxState } from '../lib/fx'
+import { getStatus, subscribeStatus } from '../lib/offline'
 
 interface AppCtx {
   repo: Repo
@@ -94,6 +95,15 @@ export function useTrip(tripId: string | undefined) {
   useEffect(() => {
     setData(null)
     reload()
+  }, [reload])
+
+  // Cuando se terminan de subir gastos guardados sin conexión, se recargan los datos
+  useEffect(() => {
+    let prev = getStatus().pending
+    return subscribeStatus((s) => {
+      if (s.pending < prev && s.online) reload()
+      prev = s.pending
+    })
   }, [reload])
 
   return { data, error, reload }

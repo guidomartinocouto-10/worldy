@@ -350,3 +350,9 @@ body {
   .hero-decor { right: 24px; width: 280px; height: 196px; }
 }
 .welcome-scene { border-radius: 0 0 32px 32px; }
+
+/* Aviso de conexión */
+.sync-banner { position: relative; z-index: 30; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 14px; background: var(--ink); color: #fff; font-size: 12.5px; text-align: center; animation: fade 0.25s ease both; }
+.sync-banner.syncing { background: var(--yellow); color: var(--brown); }
+.sync-dot { width: 8px; height: 8px; border-radius: 4px; background: #e8a27a; flex-shrink: 0; }
+.sync-banner.syncing .sync-dot { background: var(--green); animation: float 1s ease-in-out infinite; }

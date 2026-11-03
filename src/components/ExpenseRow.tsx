@@ -20,7 +20,10 @@ export function ExpenseRow({ e, data, uid, onClick }: { e: Expense; data: TripDa
         <CategoryIcon id={e.category} />
       </div>
       <div className="col grow">
-        <span className="text15 semi ellipsis">{e.description || categoryLabel(e.category)}</span>
+        <span className="text15 semi ellipsis">
+          {e.description || categoryLabel(e.category)}
+          {e.pending && <span className="tag yellow" style={{ marginLeft: 6, fontSize: 10, verticalAlign: 'middle' }}>PENDIENTE</span>}
+        </span>
         <span className="small muted ellipsis">
           {details.join(' · ')}
           {split && (

@@ -161,7 +161,10 @@ export default function Expenses() {
                   <button key={it.p.id} type="button" className="tile dashed" onClick={() => setOpenPurchase(it.p)}>
                     <div className="ico yellow"><IconSwap /></div>
                     <div className="col grow">
-                      <span className="text15 semi">Compra de {it.p.currency}</span>
+                      <span className="text15 semi">
+                        Compra de {it.p.currency}
+                        {it.p.pending && <span className="tag yellow" style={{ marginLeft: 6, fontSize: 10 }}>PENDIENTE</span>}
+                      </span>
                       <span className="small muted">{it.p.place || 'Cambio'} · no es un gasto</span>
                     </div>
                     <div className="col" style={{ alignItems: 'flex-end' }}>

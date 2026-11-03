@@ -1,6 +1,9 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Repo } from './repo'
 import type { Budget, Destination, Expense, Member, Profile, Purchase, Settlement, Trip, TripData } from './types'
+import {
+  enqueue, getQueue, isNetworkError, newId, readCache, recalledUid, rememberUid, removeFromQueue, saveCache, setStatus, getStatus,
+} from './offline'
 
 const n = (v: unknown) => (v === null || v === undefined ? 0 : Number(v))
 
@@ -15,10 +18,77 @@ export function createSupabaseRepo(url: string, anonKey: string): Repo {
   })
 
   async function uid(): Promise<string> {
-    const { data } = await sb.auth.getSession()
-    const id = data.session?.user.id
-    if (!id) throw new Error('No has iniciado sesión')
-    return id
+    let id: string | undefined
+    try {
+      const { data } = await sb.auth.getSession()
+      id = data.session?.user.id
+    } catch {
+      /* sin conexión */
+    }
+    if (id) {
+      rememberUid(id)
+      return id
+    }
+    const recalled = !navigator.onLine ? recalledUid() : null
+    if (recalled) return recalled
+    throw new Error('No has iniciado sesión')
+  }
+
+  // ---------- Sin conexión: subir pendientes ----------
+  async function pushExpense(e: Expense) {
+    const { shares, pending: _p, ...row } = e
+    void _p
+    check(await sb.from('expenses').upsert(row, { onConflict: 'id', ignoreDuplicates: true }))
+    const res = await sb
+      .from('expense_shares')
+      .upsert(shares.map((x) => ({ expense_id: e.id, user_id: x.user_id, share_usd: x.share_usd })), {
+        onConflict: 'expense_id,user_id',
+        ignoreDuplicates: true,
+      })
+    if (res.error) {
+      if (isNetworkError(new Error(res.error.message))) throw new Error(res.error.message)
+      // Si no se pudieron guardar las partes, se deshace el gasto para no dejarlo incompleto
+      await sb.from('expenses').delete().eq('id', e.id)
+      throw new Error(res.error.message)
+    }
+  }
+
+  async function pushPurchase(p: Purchase) {
+    const { pending: _p, ...row } = p
+    void _p
+    check(await sb.from('currency_purchases').upsert(row, { onConflict: 'id', ignoreDuplicates: true }))
+  }
+
+  async function flush() {
+    if (getStatus().syncing || !navigator.onLine || getQueue().length === 0) return
+    setStatus({ syncing: true })
+    try {
+      for (const item of getQueue()) {
+        try {
+          if (item.kind === 'expense') await pushExpense(item.expense)
+          else await pushPurchase(item.purchase)
+          removeFromQueue(item.kind === 'expense' ? item.expense.id : item.purchase.id)
+        } catch (e) {
+          if (isNetworkError(e)) break
+          console.error('No se pudo subir un movimiento pendiente', e)
+          removeFromQueue(item.kind === 'expense' ? item.expense.id : item.purchase.id)
+        }
+      }
+    } finally {
+      setStatus({ syncing: false })
+    }
+  }
+  window.addEventListener('online', () => {
+    flush()
+  })
+  setTimeout(() => flush(), 1500)
+
+  /** Agrega a los datos los movimientos que todavía no se subieron */
+  function withPending(d: TripData): TripData {
+    const q = getQueue()
+    const exp = q.flatMap((i) => (i.kind === 'expense' && i.expense.trip_id === d.trip.id && !d.expenses.some((e) => e.id === i.expense.id) ? [{ ...i.expense, pending: true }] : []))
+    const pur = q.flatMap((i) => (i.kind === 'purchase' && i.purchase.trip_id === d.trip.id && !d.purchases.some((p) => p.id === i.purchase.id) ? [{ ...i.purchase, pending: true }] : []))
+    return exp.length || pur.length ? { ...d, expenses: [...d.expenses, ...exp], purchases: [...d.purchases, ...pur] } : d
   }
 
   async function loadMany(tripIds: string[]): Promise<TripData[]> {
@@ -75,12 +145,26 @@ export function createSupabaseRepo(url: string, anonKey: string): Repo {
     mode: 'supabase',
 
     async currentUserId() {
-      const { data } = await sb.auth.getSession()
-      return data.session?.user.id ?? null
+      try {
+        const { data } = await sb.auth.getSession()
+        const id = data.session?.user.id ?? null
+        if (id) rememberUid(id)
+        if (id || navigator.onLine) return id
+      } catch {
+        /* sin conexión */
+      }
+      return navigator.onLine ? null : recalledUid()
     },
 
     onAuthChange(cb) {
-      const { data } = sb.auth.onAuthStateChange((_e, session) => cb(session?.user.id ?? null))
+      const { data } = sb.auth.onAuthStateChange((event, session) => {
+        const id = session?.user.id ?? null
+        if (id) rememberUid(id)
+        if (event === 'SIGNED_OUT') rememberUid(null)
+        // Sin conexión no se cierra la sesión: se sigue usando la última cuenta
+        if (!id && event !== 'SIGNED_OUT' && !navigator.onLine) return cb(recalledUid())
+        cb(id)
+      })
       return () => data.subscription.unsubscribe()
     },
 
@@ -97,8 +181,16 @@ export function createSupabaseRepo(url: string, anonKey: string): Repo {
     },
 
     async getProfile(id) {
-      const p = check(await sb.from('profiles').select('*').eq('id', id).maybeSingle()) as Profile | null
-      return p ?? { id, name: 'Viajero', avatar_url: null, equiv_currency: 'UYU' }
+      try {
+        const p = check(await sb.from('profiles').select('*').eq('id', id).maybeSingle()) as Profile | null
+        const profile = p ?? { id, name: 'Viajero', avatar_url: null, equiv_currency: 'UYU' }
+        saveCache(`profile:${id}`, profile)
+        return profile
+      } catch (e) {
+        const c = readCache<Profile>(`profile:${id}`)
+        if (c && isNetworkError(e)) return c.value
+        throw e
+      }
     },
 
     async updateProfile(patch) {
@@ -107,15 +199,46 @@ export function createSupabaseRepo(url: string, anonKey: string): Repo {
     },
 
     async loadAllTrips() {
-      const id = await uid()
-      const rows = check(await sb.from('trip_members').select('trip_id').eq('user_id', id)) as { trip_id: string }[]
-      return loadMany(rows.map((r) => r.trip_id))
+      try {
+        flush()
+        const id = await uid()
+        const rows = check(await sb.from('trip_members').select('trip_id').eq('user_id', id)) as { trip_id: string }[]
+        const all = await loadMany(rows.map((r) => r.trip_id))
+        saveCache('all', all)
+        all.forEach((d) => saveCache(`trip:${d.trip.id}`, d))
+        setStatus({ cachedAt: null })
+        return all.map(withPending)
+      } catch (e) {
+        const c = readCache<TripData[]>('all')
+        if (c && isNetworkError(e)) {
+          setStatus({ cachedAt: c.at, online: false })
+          return c.value.map(withPending)
+        }
+        throw e
+      }
     },
 
     async loadTrip(tripId) {
-      const [data] = await loadMany([tripId])
-      if (!data) throw new Error('No se encontró el viaje')
-      return data
+      try {
+        flush()
+        const [data] = await loadMany([tripId])
+        if (!data) throw new Error('No se encontró el viaje')
+        saveCache(`trip:${tripId}`, data)
+        setStatus({ cachedAt: null })
+        return withPending(data)
+      } catch (e) {
+        if (isNetworkError(e)) {
+          const c = readCache<TripData>(`trip:${tripId}`)
+          const fromAll = readCache<TripData[]>('all')
+          const hit = c ?? (fromAll ? { at: fromAll.at, value: fromAll.value.find((d) => d.trip.id === tripId) } : null)
+          if (hit?.value) {
+            setStatus({ cachedAt: hit.at, online: false })
+            return withPending(hit.value)
+          }
+          throw new Error('Sin conexión. Abre este viaje una vez con internet para poder usarlo sin conexión.')
+        }
+        throw e
+      }
     },
 
     async createTrip(t) {
@@ -178,28 +301,50 @@ export function createSupabaseRepo(url: string, anonKey: string): Repo {
     },
 
     async addExpense(e) {
-      const id = await uid()
-      const { shares, ...row } = e
-      const created = check(await sb.from('expenses').insert({ ...row, created_by: id }).select().single()) as Expense
-      const finalShares = shares.length ? shares : [{ user_id: id, share_usd: e.amount_usd }]
-      const res = await sb.from('expense_shares').insert(finalShares.map((s) => ({ ...s, expense_id: created.id })))
-      if (res.error) {
-        // Si no se pudieron guardar las partes, se deshace el gasto para no dejarlo incompleto
-        await sb.from('expenses').delete().eq('id', created.id)
-        throw new Error(res.error.message)
+      const me = await uid()
+      const expenseId = newId()
+      const finalShares = e.shares.length ? e.shares : [{ user_id: me, share_usd: e.amount_usd }]
+      const full: Expense = {
+        ...e,
+        id: expenseId,
+        created_by: me,
+        created_at: new Date().toISOString(),
+        shares: finalShares.map((s) => ({ ...s, expense_id: expenseId })),
+      }
+      if (!navigator.onLine) {
+        enqueue({ kind: 'expense', expense: full })
+        return
+      }
+      try {
+        await pushExpense(full)
+      } catch (err) {
+        if (!isNetworkError(err)) throw err
+        enqueue({ kind: 'expense', expense: full })
       }
     },
 
     async deleteExpense(expenseId) {
+      if (removeFromQueue(expenseId)) return
       check(await sb.from('expenses').delete().eq('id', expenseId))
     },
 
     async addPurchase(p) {
-      const id = await uid()
-      check(await sb.from('currency_purchases').insert({ ...p, user_id: id }))
+      const me = await uid()
+      const full: Purchase = { ...p, id: newId(), user_id: me }
+      if (!navigator.onLine) {
+        enqueue({ kind: 'purchase', purchase: full })
+        return
+      }
+      try {
+        await pushPurchase(full)
+      } catch (err) {
+        if (!isNetworkError(err)) throw err
+        enqueue({ kind: 'purchase', purchase: full })
+      }
     },
 
     async deletePurchase(purchaseId) {
+      if (removeFromQueue(purchaseId)) return
       check(await sb.from('currency_purchases').delete().eq('id', purchaseId))
     },
 

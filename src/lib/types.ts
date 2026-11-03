@@ -102,6 +102,7 @@ export interface Expense {
   spent_on: string
   created_at: string
   shares: Share[]
+  pending?: boolean // guardado en el celular, todavía sin subir
 }
 
 export interface Purchase {
@@ -115,6 +116,7 @@ export interface Purchase {
   currency: string
   place: string
   bought_on: string
+  pending?: boolean
 }
 
 export interface Settlement {
