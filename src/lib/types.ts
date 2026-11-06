@@ -153,3 +153,6 @@ export type NewExpense = Omit<Expense, 'id' | 'created_at' | 'shares' | 'created
 }
 export type NewDestination = Omit<Destination, 'id'>
 export type NewPurchase = Omit<Purchase, 'id' | 'user_id'>
+
+/** País para mostrar junto a la ciudad (vacío si el destino es todo el país) */
+export const countryLabel = (d: Pick<Destination, 'city' | 'country'>) => (d.country && d.country !== d.city ? d.country : '')

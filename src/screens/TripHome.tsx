@@ -12,7 +12,7 @@ import { currentAlert, destStats, myShare, totals } from '../lib/calc'
 import { fromUSD } from '../lib/fx'
 import { money, money0, initials } from '../lib/format'
 import { dateRange, daysBetween, shortDate, todayISO } from '../lib/dates'
-import type { Expense } from '../lib/types'
+import { countryLabel, type Expense } from '../lib/types'
 
 export default function TripHome() {
   const { tripId } = useParams()
@@ -194,7 +194,7 @@ export default function TripHome() {
             <div className="row between">
               <div className="col">
                 <span className="tl-city" style={{ fontSize: 28 }}>{current.dest.city}</span>
-                <span className="text14 muted">{current.dest.country}</span>
+                {countryLabel(current.dest) && <span className="text14 muted">{countryLabel(current.dest)}</span>}
               </div>
               <span className="stamp-pop"><Stamp city={current.dest.city} label="Llegada" date={shortDate(current.dest.start_date)} tone="amber" size={68} /></span>
             </div>
@@ -223,7 +223,7 @@ export default function TripHome() {
                   <span className="num-badge">{i + 1}</span>
                   <div className="col grow">
                     <span className="text15 bold">
-                      {s.dest.city} <span className="muted" style={{ fontWeight: 400 }}>· {s.dest.country}</span>
+                      {s.dest.city} {countryLabel(s.dest) && <span className="muted" style={{ fontWeight: 400 }}>· {countryLabel(s.dest)}</span>}
                     </span>
                     <span className="small muted">
                       {dateRange(s.dest.start_date, s.dest.end_date)} · presupuesto {money0(s.budget)}

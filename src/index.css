@@ -356,3 +356,13 @@ body {
 .sync-banner.syncing { background: var(--yellow); color: var(--brown); }
 .sync-dot { width: 8px; height: 8px; border-radius: 4px; background: #e8a27a; flex-shrink: 0; }
 .sync-banner.syncing .sync-dot { background: var(--green); animation: float 1s ease-in-out infinite; }
+
+/* Sugerencias al escribir */
+.ac { position: relative; }
+.ac-box { position: relative; }
+.ac-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); display: flex; }
+.ac-spin { position: absolute; right: 14px; top: 50%; width: 16px; height: 16px; margin-top: -8px; border-radius: 50%; border: 2px solid var(--green-tint); border-top-color: var(--green); animation: spin 0.8s linear infinite; }
+.ac-list { position: absolute; z-index: 60; left: 0; right: 0; top: calc(100% - 2px); margin: 0; padding: 6px; list-style: none; background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 12px 28px rgba(20, 51, 38, 0.16); max-height: 280px; overflow-y: auto; animation: fade 0.15s ease both; }
+.ac-list button { width: 100%; text-align: left; border: none; background: transparent; padding: 10px 12px; border-radius: 10px; display: flex; flex-direction: column; gap: 2px; }
+.ac-list button.on, .ac-list button:hover { background: var(--green-tint); }
+.ac + .ac .ac-list { z-index: 59; }

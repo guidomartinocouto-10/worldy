@@ -10,7 +10,7 @@ import { MoveBudgetSheet } from '../components/MoveBudgetSheet'
 import { destStats, myShare, totals, type DestStats } from '../lib/calc'
 import { money0, money } from '../lib/format'
 import { dateRange, nights, shortDate } from '../lib/dates'
-import { TRANSPORT, type Destination } from '../lib/types'
+import { TRANSPORT, countryLabel, type Destination } from '../lib/types'
 
 export default function Route() {
   const { tripId } = useParams()
@@ -200,7 +200,7 @@ function Stop({ s, index, cost, uid, onEdit }: { s: DestStats; index: number; co
             )}
           </div>
           <span className={`text13 ${s.status === 'current' ? '' : 'muted'}`} style={s.status === 'current' ? { color: 'var(--brown-2)' } : undefined}>
-            {[s.dest.country, dateRange(s.dest.start_date, s.dest.end_date), `${s.days} ${s.days === 1 ? 'noche' : 'noches'}`].filter(Boolean).join(' · ')}
+            {[countryLabel(s.dest), dateRange(s.dest.start_date, s.dest.end_date), `${s.days} ${s.days === 1 ? 'noche' : 'noches'}`].filter(Boolean).join(' · ')}
           </span>
           {s.lodgingPrepaid > 0 ? (
             <span className="text13 ink2">Alojamiento reservado {money0(s.lodgingPrepaid)}</span>

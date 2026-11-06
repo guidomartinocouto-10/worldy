@@ -1,9 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Sheet, Switch } from './ui'
 import { useApp } from '../app/AppContext'
 import type { Destination, TransportMode, TripData } from '../lib/types'
 import { TRANSPORT } from '../lib/types'
 import { allCurrencies, currencyName, guessCurrency } from '../lib/fx'
+import { Autocomplete, type Suggestion } from './Autocomplete'
+import { IconPin } from './Icons'
+import { countryByName, searchCities, searchCountries, type CityOption, type CountryOption } from '../lib/places'
 import { parseAmount } from '../lib/format'
 import { addDays } from '../lib/dates'
 
@@ -23,7 +26,8 @@ export function DestinationSheet({
   onSaved: () => void
 }) {
   const { repo, uid, fx, toast } = useApp()
-  const [city, setCity] = useState(dest?.city ?? '')
+  // Un destino de solo país guarda el nombre del país también como ciudad
+  const [city, setCity] = useState(dest && dest.city !== dest.country ? dest.city : '')
   const [country, setCountry] = useState(dest?.country ?? '')
   const [currency, setCurrency] = useState(dest?.currency ?? 'USD')
   const [currencyTouched, setCurrencyTouched] = useState(!!dest)
@@ -41,12 +45,28 @@ export function DestinationSheet({
   const onCountry = (v: string) => {
     setCountry(v)
     if (!currencyTouched) {
-      const g = guessCurrency(v)
+      const g = countryByName(v)?.currency ?? guessCurrency(v)
       if (g) setCurrency(g)
     }
   }
 
-  const valid = city.trim() && start && end && end >= start
+  const countrySuggestions = useCallback(
+    (q: string): Suggestion<CountryOption>[] =>
+      searchCountries(q).map((c) => ({ key: c.code, label: c.name, detail: `Moneda: ${c.currency}`, value: c })),
+    [],
+  )
+  const citySuggestions = useCallback(
+    async (q: string, signal: AbortSignal): Promise<Suggestion<CityOption>[]> => {
+      const res = await searchCities(q, signal)
+      const cc = countryByName(country)?.code
+      const sorted = cc ? [...res.filter((r) => r.countryCode === cc), ...res.filter((r) => r.countryCode !== cc)] : res
+      return sorted.map((c) => ({ key: String(c.id), label: c.name, detail: [c.region, c.country].filter(Boolean).join(', '), value: c }))
+    },
+    [country],
+  )
+
+  const place = city.trim() || country.trim()
+  const valid = place && start && end && end >= start
   const save = async () => {
     if (!valid || !uid) return
     setBusy(true)
@@ -54,7 +74,7 @@ export function DestinationSheet({
       const saved = await repo.saveDestination({
         id: dest?.id,
         trip_id: data.trip.id,
-        city: city.trim(),
+        city: place,
         country: country.trim(),
         currency,
         start_date: start,
@@ -88,16 +108,34 @@ export function DestinationSheet({
   return (
     <Sheet title={dest ? `Editar ${dest.city}` : 'Agregar destino'} onClose={onClose}>
       <div className="card" style={{ gap: 14 }}>
-        <div className="grid2" style={{ gap: 10 }}>
-          <div className="field">
-            <label htmlFor="city">Ciudad</label>
-            <input id="city" className="input" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej. Roma" disabled={!canEditShared} />
-          </div>
-          <div className="field">
-            <label htmlFor="country">País</label>
-            <input id="country" className="input" value={country} onChange={(e) => onCountry(e.target.value)} placeholder="Ej. Italia" disabled={!canEditShared} />
-          </div>
-        </div>
+        <Autocomplete<CountryOption>
+          id="country"
+          label="País"
+          value={country}
+          onChange={onCountry}
+          onPick={(s) => {
+            setCountry(s.value.name)
+            if (!currencyTouched) setCurrency(s.value.currency)
+          }}
+          getSuggestions={countrySuggestions}
+          placeholder="Ej. Italia"
+          disabled={!canEditShared}
+        />
+        <Autocomplete<CityOption>
+          id="city"
+          label="Ciudad (opcional)"
+          value={city}
+          onChange={setCity}
+          onPick={(s) => {
+            setCity(s.value.name)
+            if (s.value.country) setCountry(s.value.country)
+            if (s.value.currency && !currencyTouched) setCurrency(s.value.currency)
+          }}
+          getSuggestions={citySuggestions}
+          placeholder="Ej. Roma · déjalo vacío para todo el país"
+          disabled={!canEditShared}
+          icon={<IconPin size={16} />}
+        />
         <div className="grid2" style={{ gap: 10 }}>
           <div className="field">
             <label htmlFor="d-start">Llegada</label>

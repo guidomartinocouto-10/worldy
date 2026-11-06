@@ -5,7 +5,7 @@ import { IconBack } from '../components/Icons'
 import { Confetti, HeroDecor, MedalArt } from '../components/Illustrations'
 import { Stamp } from '../components/Travel'
 import { byCategory, destStats, isPrepaid, myShare, totals } from '../lib/calc'
-import { categoryLabel, type TripData } from '../lib/types'
+import { categoryLabel, countryLabel, type TripData } from '../lib/types'
 import { money0, num } from '../lib/format'
 import { fromUSD } from '../lib/fx'
 import { dateRange, nights, shortDate, todayISO } from '../lib/dates'
@@ -83,7 +83,7 @@ export default function Summary() {
             <div className="row" style={{ flexWrap: 'wrap', gap: 10, justifyContent: 'center', padding: '6px 0' }}>
               {stats.map((s, i) => (
                 <span key={s.dest.id} className="stamp-pop" style={{ animationDelay: `${0.15 + i * 0.12}s`, opacity: s.status === 'upcoming' ? 0.35 : 1 }}>
-                  <Stamp city={s.dest.city} label={s.dest.country.slice(0, 12) || 'Destino'} date={shortDate(s.dest.start_date)} size={78} tilt={[-9, 7, -4, 10, -12, 5, -6, 8][i % 8]} tone={i % 2 ? 'amber' : 'green'} />
+                  <Stamp city={s.dest.city} label={countryLabel(s.dest).slice(0, 12) || 'País'} date={shortDate(s.dest.start_date)} size={78} tilt={[-9, 7, -4, 10, -12, 5, -6, 8][i % 8]} tone={i % 2 ? 'amber' : 'green'} />
                 </span>
               ))}
             </div>
