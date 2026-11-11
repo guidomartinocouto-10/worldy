@@ -65,10 +65,13 @@ export default function DestinationDetail() {
           <div className="desk-col sticky">
             <section className="section">
               <div className="card">
-                <span className="text13 muted" style={{ fontWeight: 500 }}>Tu presupuesto en {s.dest.city}</span>
+                <div className="row between">
+                  <span className="text13 muted" style={{ fontWeight: 500 }}>Tu presupuesto en {s.dest.city}</span>
+                  <button className="link-btn" style={{ padding: 0, fontSize: 13 }} onClick={() => setEditing(true)}>{s.budget > 0 ? 'Cambiar' : 'Definir presupuesto'}</button>
+                </div>
                 <div className="row between baseline">
                   <HeroAmount value={s.spent} size={38} />
-                  <span className="text14 muted">de {money0(s.budget)}</span>
+                  <span className="text14 muted">{s.budget > 0 ? `de ${money0(s.budget)}` : 'sin presupuesto'}</span>
                 </div>
                 <Bar pct={s.pct} variant={variant} />
                 <div className="row between text13 ink2">

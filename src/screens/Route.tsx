@@ -198,7 +198,10 @@ function Stop({ s, index, cost, uid, onEdit, pendingCount }: { s: DestStats; ind
             ) : s.status === 'current' ? (
               <span className="small bold amber">ESTÁS AQUÍ</span>
             ) : (
-              <span className="text15 semi">{money0(s.budget)}</span>
+              <span className="col" style={{ alignItems: 'flex-end' }}>
+                <span className="text15 semi">{money0(s.budget > 0 ? s.budget : s.spent)}</span>
+                <span className="small muted">{s.budget > 0 ? 'presupuesto' : s.spent > 0 ? 'cargado' : 'sin presupuesto'}</span>
+              </span>
             )}
           </div>
           <span className={`text13 ${s.status === 'current' ? '' : 'muted'}`} style={s.status === 'current' ? { color: 'var(--brown-2)' } : undefined}>
@@ -211,8 +214,10 @@ function Stop({ s, index, cost, uid, onEdit, pendingCount }: { s: DestStats; ind
           ) : null}
           {(s.status !== 'upcoming' || s.spent > 0) && (
             <span className="text13 ink2">
-              {s.status === 'upcoming' ? 'Ya cargado' : 'En destino'} {money(s.spent)} de {money0(s.budget)}
+              {s.status === 'upcoming' ? 'Ya cargado' : 'En destino'} {money(s.spent)}
+              {s.budget > 0 ? ` de ${money0(s.budget)}` : ''}
               {s.status === 'upcoming' && s.budget > 0 && ` · quedan ${money0(Math.max(s.left, 0))}`}
+              {s.budget === 0 && <span className="amber"> · sin presupuesto definido, tócalo para ponerlo</span>}
               {s.status === 'past' && s.left > 0 && (
                 <>
                   {' · '}sobraron <strong className="green-text semi">{money0(s.left)}</strong>
