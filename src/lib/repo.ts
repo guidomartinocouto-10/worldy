@@ -1,4 +1,4 @@
-import type { Destination, NewDestination, NewExpense, NewPurchase, Profile, Trip, TripData } from './types'
+import type { Card, Destination, NewCard, NewDeposit, NewDestination, NewExpense, NewPurchase, Profile, Trip, TripData } from './types'
 
 /** Operaciones de datos de la app. Hay dos versiones: Supabase (real) y demo (en el teléfono). */
 export interface Repo {
@@ -24,7 +24,12 @@ export interface Repo {
   moveBudget(tripId: string, fromDest: string, toDest: string, amountUsd: number): Promise<void>
 
   addExpense(e: NewExpense): Promise<void>
+  updateExpense(id: string, e: NewExpense): Promise<void>
   deleteExpense(id: string): Promise<void>
+  addCard(c: NewCard): Promise<Card>
+  deleteCard(id: string): Promise<void>
+  addDeposit(d: NewDeposit): Promise<void>
+  deleteDeposit(id: string): Promise<void>
   addPurchase(p: NewPurchase): Promise<void>
   deletePurchase(id: string): Promise<void>
   addSettlement(tripId: string, fromUser: string, toUser: string, amountUsd: number): Promise<void>

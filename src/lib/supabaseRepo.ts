@@ -1,8 +1,8 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Repo } from './repo'
-import type { Budget, Destination, Expense, Member, Profile, Purchase, Settlement, Trip, TripData } from './types'
+import type { Budget, Card, Destination, Expense, FundDeposit, Member, Profile, Purchase, Settlement, Trip, TripData } from './types'
 import {
-  enqueue, getQueue, isNetworkError, newId, readCache, recalledUid, rememberUid, removeFromQueue, saveCache, setStatus, getStatus,
+  enqueue, getQueue, setQueue, isNetworkError, newId, readCache, recalledUid, rememberUid, removeFromQueue, saveCache, setStatus, getStatus,
 } from './offline'
 
 const n = (v: unknown) => (v === null || v === undefined ? 0 : Number(v))
@@ -35,10 +35,28 @@ export function createSupabaseRepo(url: string, anonKey: string): Repo {
   }
 
   // ---------- Sin conexión: subir pendientes ----------
-  async function pushExpense(e: Expense) {
-    const { shares, pending: _p, ...row } = e
+  /** Quita los campos nuevos cuando no se usan, para que funcione aunque falte la actualización 2 */
+  function expenseRow(e: Expense): Record<string, unknown> {
+    const { shares: _s, pending: _p, ...row } = e
+    void _s
     void _p
-    check(await sb.from('expenses').upsert(row, { onConflict: 'id', ignoreDuplicates: true }))
+    const r: Record<string, unknown> = { ...row }
+    if (!r.paid_from_fund) delete r.paid_from_fund
+    for (const k of ['card_id', 'payments', 'payee', 'due_date']) if (r[k] === null || r[k] === undefined) delete r[k]
+    return r
+  }
+
+  function friendly(msg: string): string {
+    return /column|relation|schema cache/i.test(msg)
+      ? 'Falta correr la actualización 2 de la base de datos en Supabase para usar señas, tarjetas y fondo común.'
+      : msg
+  }
+
+  async function pushExpense(e: Expense) {
+    const { shares } = e
+    const row = expenseRow(e)
+    const up = await sb.from('expenses').upsert(row, { onConflict: 'id', ignoreDuplicates: true })
+    if (up.error) throw new Error(friendly(up.error.message))
     const res = await sb
       .from('expense_shares')
       .upsert(shares.map((x) => ({ expense_id: e.id, user_id: x.user_id, share_usd: x.share_usd })), {
@@ -93,7 +111,8 @@ export function createSupabaseRepo(url: string, anonKey: string): Repo {
 
   async function loadMany(tripIds: string[]): Promise<TripData[]> {
     if (tripIds.length === 0) return []
-    const [trips, members, dests, budgets, expenses, purchases, settlements] = await Promise.all([
+    const me = await uid()
+    const [trips, members, dests, budgets, expenses, purchases, settlements, cardsRes, depositsRes] = await Promise.all([
       sb.from('trips').select('*').in('id', tripIds),
       sb.from('trip_members').select('*').in('trip_id', tripIds),
       sb.from('destinations').select('*').in('trip_id', tripIds),
@@ -101,7 +120,14 @@ export function createSupabaseRepo(url: string, anonKey: string): Repo {
       sb.from('expenses').select('*, shares:expense_shares(*)').in('trip_id', tripIds),
       sb.from('currency_purchases').select('*').in('trip_id', tripIds),
       sb.from('settlements').select('*').in('trip_id', tripIds),
+      sb.from('cards').select('*').or(`trip_id.in.(${tripIds.join(',')}),owner_id.eq.${me}`),
+      sb.from('fund_deposits').select('*').in('trip_id', tripIds),
     ])
+    // Si todavía no se corrió la actualización 2 de la base de datos, estas tablas no existen
+    const cardRows = cardsRes.error ? [] : ((cardsRes.data ?? []) as Card[])
+    const depositRows = depositsRes.error
+      ? []
+      : ((depositsRes.data ?? []) as FundDeposit[]).map((d) => ({ ...d, amount: n(d.amount), amount_usd: n(d.amount_usd) }))
     const memberRows = check(members) as { trip_id: string; user_id: string; role: 'owner' | 'member' }[]
     const userIds = [...new Set(memberRows.map((m) => m.user_id))]
     const profiles = userIds.length
@@ -119,6 +145,11 @@ export function createSupabaseRepo(url: string, anonKey: string): Repo {
       amount_usd: n(e.amount_usd),
       card_debited_usd: e.card_debited_usd === null ? null : n(e.card_debited_usd),
       shares: (e.shares ?? []).map((s) => ({ ...s, share_usd: n(s.share_usd) })),
+      paid_from_fund: !!e.paid_from_fund,
+      card_id: e.card_id ?? null,
+      payments: Array.isArray(e.payments) && e.payments.length ? e.payments.map((p) => ({ ...p, amount: n(p.amount) })) : null,
+      payee: e.payee ?? null,
+      due_date: e.due_date ?? null,
     }))
     const purchaseRows = (check(purchases) as Purchase[]).map((p) => ({
       ...p,
@@ -138,6 +169,8 @@ export function createSupabaseRepo(url: string, anonKey: string): Repo {
       expenses: expenseRows.filter((e) => e.trip_id === trip.id),
       purchases: purchaseRows.filter((p) => p.trip_id === trip.id),
       settlements: settlementRows.filter((s) => s.trip_id === trip.id),
+      cards: cardRows.filter((c) => c.trip_id === trip.id || (c.trip_id === null && c.owner_id === me)),
+      deposits: depositRows.filter((d) => d.trip_id === trip.id),
     }))
   }
 
@@ -323,9 +356,62 @@ export function createSupabaseRepo(url: string, anonKey: string): Repo {
       }
     },
 
+    async updateExpense(expenseId, e) {
+      const me = await uid()
+      const finalShares = e.shares.length ? e.shares : [{ user_id: me, share_usd: e.amount_usd }]
+      // Si el gasto todavía está guardado solo en el celular, se actualiza ahí
+      const q = getQueue()
+      const queued = q.find((i) => i.kind === 'expense' && i.expense.id === expenseId)
+      if (queued && queued.kind === 'expense') {
+        queued.expense = { ...queued.expense, ...e, id: expenseId, shares: finalShares.map((s) => ({ ...s, expense_id: expenseId })) }
+        setQueue(q)
+        return
+      }
+      if (!navigator.onLine) throw new Error('Para editar un gasto ya subido necesitas conexión.')
+      const full: Expense = { ...e, id: expenseId, created_by: me, created_at: '', shares: [] }
+      const row = expenseRow(full)
+      delete row.id
+      delete row.created_by
+      delete row.created_at
+      // Al editar, los campos vacíos se guardan vacíos
+      for (const k of ['card_id', 'payments', 'payee', 'due_date']) if (!(k in row) && k in e) row[k] = null
+      if (!('paid_from_fund' in row) && e.paid_from_fund === false) row.paid_from_fund = false
+      const up = await sb.from('expenses').update(row).eq('id', expenseId)
+      if (up.error) {
+        // Sin la actualización 2, se reintenta sin los campos nuevos
+        if (/column|schema cache/i.test(up.error.message) && !e.paid_from_fund && !e.payments && !e.card_id) {
+          for (const k of ['card_id', 'payments', 'payee', 'due_date', 'paid_from_fund']) delete row[k]
+          check(await sb.from('expenses').update(row).eq('id', expenseId))
+        } else throw new Error(friendly(up.error.message))
+      }
+      check(await sb.from('expense_shares').delete().eq('expense_id', expenseId))
+      check(await sb.from('expense_shares').insert(finalShares.map((s) => ({ expense_id: expenseId, user_id: s.user_id, share_usd: s.share_usd }))))
+    },
+
     async deleteExpense(expenseId) {
       if (removeFromQueue(expenseId)) return
       check(await sb.from('expenses').delete().eq('id', expenseId))
+    },
+
+    async addCard(c) {
+      const me = await uid()
+      const res = await sb.from('cards').insert({ ...c, owner_id: me }).select().single()
+      if (res.error) throw new Error(friendly(res.error.message))
+      return res.data as Card
+    },
+
+    async deleteCard(cardId) {
+      check(await sb.from('cards').delete().eq('id', cardId))
+    },
+
+    async addDeposit(d) {
+      const me = await uid()
+      const res = await sb.from('fund_deposits').insert({ ...d, created_by: me })
+      if (res.error) throw new Error(friendly(res.error.message))
+    },
+
+    async deleteDeposit(depositId) {
+      check(await sb.from('fund_deposits').delete().eq('id', depositId))
     },
 
     async addPurchase(p) {

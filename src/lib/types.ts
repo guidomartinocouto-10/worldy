@@ -102,7 +102,38 @@ export interface Expense {
   spent_on: string
   created_at: string
   shares: Share[]
+  paid_from_fund: boolean // pagado con la tarjeta del fondo común
+  card_id: string | null // tarjeta con la que se pagó
+  payments: Payment[] | null // pagos parciales (seña + saldo); vacío = pagado completo
+  payee: string | null // a quién hay que pagarle el saldo
+  due_date: string | null // fecha límite para pagar el saldo
   pending?: boolean // guardado en el celular, todavía sin subir
+}
+
+export interface Payment {
+  amount: number // en la moneda del gasto
+  date: string
+  card_id: string | null
+}
+
+export interface Card {
+  id: string
+  trip_id: string | null // con viaje = tarjeta grupal de ese viaje
+  owner_id: string
+  name: string
+  kind: 'personal' | 'group'
+}
+
+export interface FundDeposit {
+  id: string
+  trip_id: string
+  user_id: string
+  amount: number
+  currency: string
+  amount_usd: number
+  deposited_on: string
+  note: string
+  created_by: string
 }
 
 export interface Purchase {
@@ -137,6 +168,8 @@ export interface TripData {
   expenses: Expense[]
   purchases: Purchase[]
   settlements: Settlement[]
+  cards: Card[]
+  deposits: FundDeposit[]
 }
 
 export interface TripSummary {
@@ -148,6 +181,8 @@ export interface TripSummary {
   myTotal: number
 }
 
+export type NewCard = Omit<Card, 'id' | 'owner_id'>
+export type NewDeposit = Omit<FundDeposit, 'id' | 'created_by'>
 export type NewExpense = Omit<Expense, 'id' | 'created_at' | 'shares' | 'created_by'> & {
   shares: { user_id: string; share_usd: number }[]
 }

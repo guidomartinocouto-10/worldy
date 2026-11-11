@@ -3,7 +3,7 @@
  * Sirve para probar la app antes de conectar Supabase.
  */
 import type { Repo } from './repo'
-import type { Budget, Destination, Expense, Member, Profile, Purchase, Settlement, Trip, TripData } from './types'
+import type { Budget, Card, Destination, Expense, FundDeposit, Member, Profile, Purchase, Settlement, Trip, TripData } from './types'
 import { addDays, todayISO } from './dates'
 import { splitEqual } from './calc'
 
@@ -20,6 +20,8 @@ interface Store {
   expenses: Expense[]
   purchases: Purchase[]
   settlements: Settlement[]
+  cards: Card[]
+  deposits: FundDeposit[]
 }
 
 const uuid = () =>
@@ -56,7 +58,8 @@ function seed(): Store {
   const expenses: Expense[] = []
   const exp = (
     destination_id: string | null, category: Expense['category'], description: string, amount: number, currency: string,
-    amount_usd: number, spent_on: string, opts: { method?: 'cash' | 'card'; paid_by?: string; split?: string[] } = {},
+    amount_usd: number, spent_on: string,
+    opts: { method?: 'cash' | 'card'; paid_by?: string; split?: string[]; fund?: boolean; payments?: Expense['payments']; payee?: string; due?: string; card?: string } = {},
   ) => {
     const id = uuid()
     const paid_by = opts.paid_by ?? ME
@@ -65,6 +68,7 @@ function seed(): Store {
       id, trip_id: tripId, destination_id, created_by: paid_by, paid_by, category, description, amount, currency, amount_usd,
       method: opts.method ?? 'card', card_debited_usd: (opts.method ?? 'card') === 'card' && currency !== 'USD' ? amount_usd : null,
       spent_on, created_at: new Date().toISOString(), shares: shares.map((s) => ({ ...s, expense_id: id })),
+      paid_from_fund: !!opts.fund, card_id: opts.card ?? null, payments: opts.payments ?? null, payee: opts.payee ?? null, due_date: opts.due ?? null,
     })
   }
   const all = [ME, 'demo-so', 'demo-ma', 'demo-jp']
@@ -97,6 +101,16 @@ function seed(): Store {
   exp('d-par', 'tours', 'Museo de Orsay', 16, 'EUR', 17.4, d(6))
   exp('d-par', 'transporte', 'Metro ida y vuelta', 4.3, 'EUR', 4.78, d(6), { method: 'cash' })
 
+  // Fondo común: tarjeta grupal, aportes y una seña pagada con el fondo
+  const cards: Card[] = [
+    { id: 'card-fondo', trip_id: tripId, owner_id: ME, name: 'Fondo común', kind: 'group' },
+    { id: 'card-visa', trip_id: null, owner_id: ME, name: 'Visa personal', kind: 'personal' },
+  ]
+  const deposits: FundDeposit[] = all.map((u) => ({ id: uuid(), trip_id: tripId, user_id: u, amount: 300, currency: 'USD', amount_usd: 300, deposited_on: before, note: 'Aporte inicial', created_by: u }))
+  exp('d-lis', 'alojamiento', 'Hostel en Lisboa · seña', 400, 'USD', 400, before, {
+    split: all, fund: true, card: 'card-fondo', payments: [{ amount: 100, date: before, card_id: 'card-fondo' }], payee: 'Hostel Lisboa Central', due: d(13),
+  })
+
   const purchases: Purchase[] = [
     { id: uuid(), trip_id: tripId, user_id: ME, paid_amount: 100, paid_currency: 'USD', paid_usd: 100, received_amount: 90, currency: 'EUR', place: 'Casa de cambio', bought_on: d(5) },
   ]
@@ -111,13 +125,28 @@ function seed(): Store {
     expenses,
     purchases,
     settlements: [],
+    cards,
+    deposits,
   }
 }
 
 function load(): Store {
   try {
     const raw = localStorage.getItem(KEY)
-    if (raw) return JSON.parse(raw) as Store
+    if (raw) {
+      const st = JSON.parse(raw) as Store
+      // Datos guardados por versiones anteriores
+      st.cards ??= []
+      st.deposits ??= []
+      st.expenses.forEach((e) => {
+        e.paid_from_fund ??= false
+        e.card_id ??= null
+        e.payments ??= null
+        e.payee ??= null
+        e.due_date ??= null
+      })
+      return st
+    }
   } catch {
     /* ignorar */
   }
@@ -145,6 +174,8 @@ export function createDemoRepo(): Repo {
     expenses: s.expenses.filter((e) => e.trip_id === trip.id),
     purchases: s.purchases.filter((p) => p.trip_id === trip.id && p.user_id === ME),
     settlements: s.settlements.filter((x) => x.trip_id === trip.id),
+    cards: s.cards.filter((c) => c.trip_id === trip.id || (c.trip_id === null && c.owner_id === ME)),
+    deposits: s.deposits.filter((x) => x.trip_id === trip.id),
   })
 
   const myTrips = () => s.trips.filter((t) => s.members.some((m) => m.trip_id === t.id && m.user_id === ME))
@@ -252,8 +283,33 @@ export function createDemoRepo(): Repo {
       s.expenses.push({ ...e, id, created_by: ME, created_at: new Date().toISOString(), shares })
       save()
     },
+    async updateExpense(id, e) {
+      const cur = s.expenses.find((x) => x.id === id)
+      if (!cur) throw new Error('No se encontró el gasto')
+      const shares = (e.shares.length ? e.shares : [{ user_id: ME, share_usd: e.amount_usd }]).map((x) => ({ ...x, expense_id: id }))
+      Object.assign(cur, e, { shares })
+      save()
+    },
     async deleteExpense(id) {
       s.expenses = s.expenses.filter((e) => e.id !== id)
+      save()
+    },
+    async addCard(c) {
+      const card: Card = { ...c, id: uuid(), owner_id: ME }
+      s.cards.push(card)
+      save()
+      return card
+    },
+    async deleteCard(id) {
+      s.cards = s.cards.filter((c) => c.id !== id)
+      save()
+    },
+    async addDeposit(d) {
+      s.deposits.push({ ...d, id: uuid(), created_by: ME })
+      save()
+    },
+    async deleteDeposit(id) {
+      s.deposits = s.deposits.filter((x) => x.id !== id)
       save()
     },
     async addPurchase(p) {

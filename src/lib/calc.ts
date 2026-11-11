@@ -207,10 +207,10 @@ export function wallets(purchases: Purchase[], expenses: Expense[], uid: string)
     map.set(p.currency, w)
   }
   for (const e of expenses) {
-    if (e.method !== 'cash' || e.paid_by !== uid) continue
+    if (e.method !== 'cash' || e.paid_by !== uid || e.paid_from_fund) continue
     const w = map.get(e.currency)
     if (!w) continue
-    w.spent += e.amount
+    w.spent += paidLocal(e)
   }
   return [...map.entries()].map(([currency, w]) => ({
     currency,
@@ -223,16 +223,85 @@ export function wallets(purchases: Purchase[], expenses: Expense[], uid: string)
 
 // ---------------- Deudas entre viajeros ----------------
 
+// ---------- Señas y pagos parciales ----------
+
+/** Lo pagado hasta ahora, en la moneda del gasto */
+export function paidLocal(e: Pick<Expense, 'amount' | 'payments'>): number {
+  if (!e.payments || e.payments.length === 0) return e.amount
+  return Math.min(e.payments.reduce((a, p) => a + p.amount, 0), e.amount)
+}
+
+/** Fracción pagada (1 = pagado completo) */
+export function paidFraction(e: Pick<Expense, 'amount' | 'payments'>): number {
+  return e.amount > 0 ? paidLocal(e) / e.amount : 1
+}
+
+/** Lo que falta pagar, en la moneda del gasto y en dólares */
+export function remainingOf(e: Expense): { local: number; usd: number } {
+  const local = round2(e.amount - paidLocal(e))
+  return { local, usd: round2(local * (e.amount > 0 ? e.amount_usd / e.amount : 1)) }
+}
+
+/** Gastos con saldo pendiente que te involucran (tuyos, divididos contigo o del fondo) */
+export function pendingPayments(data: TripData, uid: string): Expense[] {
+  return data.expenses
+    .filter((e) => remainingOf(e).local > 0.004)
+    .filter((e) => e.paid_by === uid || e.paid_from_fund || myShare(e, uid) > 0)
+    .sort((a, b) => ((a.due_date ?? '9999') < (b.due_date ?? '9999') ? -1 : 1))
+}
+
+// ---------- Fondo común ----------
+
+export interface FundStats {
+  deposited: number
+  used: number // pagado con el fondo
+  balance: number
+  pendingUsd: number // saldos de señas que todavía hay que pagar con el fondo
+  perUser: Map<string, { deposited: number; used: number }>
+}
+
+export function fundStats(data: TripData): FundStats {
+  const perUser = new Map<string, { deposited: number; used: number }>()
+  const get = (u: string) => {
+    const v = perUser.get(u) ?? { deposited: 0, used: 0 }
+    perUser.set(u, v)
+    return v
+  }
+  let deposited = 0
+  let used = 0
+  let pendingUsd = 0
+  for (const d of data.deposits) {
+    deposited += d.amount_usd
+    get(d.user_id).deposited += d.amount_usd
+  }
+  for (const e of data.expenses) {
+    if (!e.paid_from_fund) continue
+    const f = paidFraction(e)
+    used += e.amount_usd * f
+    pendingUsd += remainingOf(e).usd
+    for (const s of e.shares) get(s.user_id).used += s.share_usd * f
+  }
+  for (const v of perUser.values()) {
+    v.deposited = round2(v.deposited)
+    v.used = round2(v.used)
+  }
+  return { deposited: round2(deposited), used: round2(used), balance: round2(deposited - used), pendingUsd: round2(pendingUsd), perUser }
+}
+
 /** Saldo con cada persona: positivo = te debe; negativo = le debes */
 export function balancesWith(data: TripData, uid: string): Map<string, number> {
   const bal = new Map<string, number>()
   const add = (other: string, v: number) => bal.set(other, (bal.get(other) ?? 0) + v)
   for (const e of data.expenses) {
+    // Lo pagado con el fondo común no genera deudas entre personas
+    if (e.paid_from_fund) continue
+    // En una seña, solo cuenta lo que ya se pagó
+    const f = paidFraction(e)
     if (e.paid_by === uid) {
-      for (const s of e.shares) if (s.user_id !== uid) add(s.user_id, s.share_usd)
+      for (const s of e.shares) if (s.user_id !== uid) add(s.user_id, s.share_usd * f)
     } else {
       const mine = myShare(e, uid)
-      if (mine) add(e.paid_by, -mine)
+      if (mine) add(e.paid_by, -mine * f)
     }
   }
   for (const st of data.settlements) {

@@ -15,6 +15,7 @@ const Expenses = lazy(() => import('./screens/Expenses'))
 const Group = lazy(() => import('./screens/Group'))
 const Summary = lazy(() => import('./screens/Summary'))
 const Profile = lazy(() => import('./screens/Profile'))
+const DestinationDetail = lazy(() => import('./screens/DestinationDetail'))
 
 const PENDING_KEY = 'worldy.pendingJoin'
 
@@ -64,6 +65,7 @@ export default function App() {
           <Route path="/unirme/:code" element={<JoinLink />} />
           <Route path="/v/:tripId" element={<TripHome />} />
           <Route path="/v/:tripId/ruta" element={<Route_ />} />
+          <Route path="/v/:tripId/d/:destId" element={<DestinationDetail />} />
           <Route path="/v/:tripId/gasto" element={<AddExpense />} />
           <Route path="/v/:tripId/cambio" element={<BuyCurrency />} />
           <Route path="/v/:tripId/gastos" element={<Expenses />} />

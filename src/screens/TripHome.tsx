@@ -8,7 +8,7 @@ import { BoardingPass, Stamp, greeting } from '../components/Travel'
 import { ExpenseRow } from '../components/ExpenseRow'
 import { MoveBudgetSheet } from '../components/MoveBudgetSheet'
 import { ExpenseSheet } from '../components/ExpenseSheet'
-import { currentAlert, destStats, myShare, totals } from '../lib/calc'
+import { currentAlert, destStats, myShare, pendingPayments, remainingOf, totals } from '../lib/calc'
 import { fromUSD } from '../lib/fx'
 import { money, money0, initials } from '../lib/format'
 import { dateRange, daysBetween, shortDate, todayISO } from '../lib/dates'
@@ -29,6 +29,7 @@ export default function TripHome() {
   const stats = destStats(data, uid, today)
   const tt = totals(data, uid)
   const alert = currentAlert(stats)
+  const pending = pendingPayments(data, uid)
   const current = stats.find((s) => s.status === 'current')
   const upcoming = stats.filter((s) => s.status === 'upcoming').slice(0, 3)
   const pastLeft = stats.filter((s) => s.status === 'past' && s.left > 0.5)
@@ -150,6 +151,34 @@ export default function TripHome() {
 
       </div>
       <div className="desk-col">
+      {pending.length > 0 && (
+        <section className="section">
+          <div className="card yellow" style={{ gap: 8 }}>
+            <div className="row between">
+              <strong className="text15 brown">Pagos pendientes</strong>
+              <span className="small" style={{ color: 'var(--brown-2)' }}>{pending.length} {pending.length === 1 ? 'seña' : 'señas'}</span>
+            </div>
+            {pending.slice(0, 3).map((e) => {
+              const r = remainingOf(e)
+              const d = data.destinations.find((x) => x.id === e.destination_id)
+              return (
+                <button key={e.id} type="button" onClick={() => setOpenExpense(e)} className="row between" style={{ background: 'none', border: 'none', padding: '6px 0', textAlign: 'left', width: '100%' }}>
+                  <div className="col">
+                    <span className="text14 semi brown">{e.description || 'Seña'}{d ? ` · ${d.city}` : ''}</span>
+                    <span className="small" style={{ color: 'var(--brown-2)' }}>
+                      {e.payee ? `A ${e.payee}` : 'Saldo'}
+                      {e.due_date ? ` · antes del ${shortDate(e.due_date)}` : ''}
+                      {e.paid_from_fund ? ' · fondo común' : ''}
+                    </span>
+                  </div>
+                  <span className="text14 semi brown">{money(r.local, e.currency, { decimals: 2 })}</span>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
       {!alert && current && current.budget > 0 && current.pct <= current.dayIndex / current.days && (
         <section className="section">
           <div className="cheer">
@@ -184,7 +213,7 @@ export default function TripHome() {
         )}
 
         {current && (
-          <div className="card current" style={{ gap: 10 }}>
+          <Link to={`/v/${data.trip.id}/d/${current.dest.id}`} className="card current" style={{ gap: 10, textDecoration: 'none', color: 'inherit' }}>
             <div className="row between">
               <span className="tag yellow">ESTÁS AQUÍ</span>
               <span className="text13" style={{ color: 'var(--brown-2)' }}>
@@ -207,7 +236,12 @@ export default function TripHome() {
                 {current.left >= 0 ? `Quedan ${money(current.left)}` : `Excedido ${money(-current.left)}`}
               </span>
             </div>
-          </div>
+          </Link>
+        )}
+        {current && (
+          <Link to={`/v/${data.trip.id}/gasto?destino=${current.dest.id}`} className="btn primary small block">
+            + Agregar gasto en {current.dest.city}
+          </Link>
         )}
 
         {upcoming.length > 0 && (current || !started) && (
@@ -219,7 +253,7 @@ export default function TripHome() {
             <span className="label-caps" style={{ marginTop: 6 }}>Próximos · presupuesto libre</span>
             <div className="card tight">
               {upcoming.map((s, i) => (
-                <div className="list-item" key={s.dest.id}>
+                <Link to={`/v/${data.trip.id}/d/${s.dest.id}`} className="list-item" key={s.dest.id} style={{ textDecoration: 'none', color: 'inherit' }}>
                   <span className="num-badge">{i + 1}</span>
                   <div className="col grow">
                     <span className="text15 bold">
@@ -233,7 +267,7 @@ export default function TripHome() {
                     <span className="text15 semi green-text">{money0(Math.max(s.left, 0))}</span>
                     <span className="small muted">libres</span>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </>

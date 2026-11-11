@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useApp, useTrip } from '../app/AppContext'
 import { BottomNav, ErrorPage, Loading } from '../components/ui'
 import { IconHome, IconPlane, IconPlus, IconTrain } from '../components/Icons'
@@ -16,6 +16,7 @@ export default function Route() {
   const { tripId } = useParams()
   const { uid, repo, toast } = useApp()
   const { data, error, reload } = useTrip(tripId)
+  const nav = useNavigate()
   const [editing, setEditing] = useState<Destination | 'new' | null>(null)
   const [moveOpen, setMoveOpen] = useState(false)
 
@@ -100,7 +101,7 @@ export default function Route() {
           </div>
         )}
         {stats.map((s, i) => (
-          <Stop key={s.dest.id} s={s} index={i} cost={legCost(s.dest.id)} uid={uid} onEdit={() => setEditing(s.dest)} />
+          <Stop key={s.dest.id} s={s} index={i} cost={legCost(s.dest.id)} uid={uid} onEdit={() => nav(`/v/${data.trip.id}/d/${s.dest.id}`)} />
         ))}
 
         <div className="tl-connector" style={{ minHeight: 28 }}>

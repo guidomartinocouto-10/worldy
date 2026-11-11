@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useApp, useTrip } from '../app/AppContext'
 import { Avatar, BottomNav, ErrorPage, Loading, Sheet } from '../components/ui'
 import { InviteCard } from '../components/InviteCard'
+import { FundSection } from '../components/FundSection'
 import { FriendsArt, HeroDecor } from '../components/Illustrations'
 import { ExpenseSheet } from '../components/ExpenseSheet'
 import { balancesWith, myShare } from '../lib/calc'
@@ -116,6 +117,10 @@ export default function Group() {
           </section>
 
           <section className="section mt-lg">
+            <h2 className="h2">Fondo común</h2>
+            <FundSection data={data} onChanged={reload} onOpenExpense={setOpenExpense} />
+          </section>
+          <section className="section mt-lg">
             <h2 className="h2">Invitar a más viajeros</h2>
             <InviteCard trip={data.trip} />
           </section>
@@ -125,7 +130,7 @@ export default function Group() {
             <h2 className="h2" style={{ marginBottom: 4 }}>Gastos divididos</h2>
             {shared.length === 0 && <div className="empty">Todavía no hay gastos divididos. Al cargar un gasto, activa “Dividir gasto”.</div>}
             {shared.map((e) => {
-              const payer = e.paid_by === uid ? 'Pagaste tú' : `Pagó ${firstName(data.members.find((m) => m.user_id === e.paid_by)?.profile.name ?? '')}`
+              const payer = e.paid_from_fund ? 'Fondo común' : e.paid_by === uid ? 'Pagaste tú' : `Pagó ${firstName(data.members.find((m) => m.user_id === e.paid_by)?.profile.name ?? '')}`
               const mine = myShare(e, uid)
               const owedToMe = e.paid_by === uid ? e.amount_usd - mine : 0
               return (
@@ -136,7 +141,9 @@ export default function Group() {
                   </div>
                   <div className="col" style={{ alignItems: 'flex-end' }}>
                     <span className="text15 amount">{money(e.amount_usd)}</span>
-                    {e.paid_by === uid ? (
+                    {e.paid_from_fund ? (
+                      <span className="small muted">Tu parte {money(mine)}</span>
+                    ) : e.paid_by === uid ? (
                       <span className="small semi green-text">Te deben {money(owedToMe)}</span>
                     ) : (
                       <span className="small semi amber">Debes {money(mine)}</span>
