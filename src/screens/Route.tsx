@@ -7,7 +7,7 @@ import { DestinationSheet } from '../components/DestinationSheet'
 import { HeroDecor, MapArt } from '../components/Illustrations'
 import { Stamp } from '../components/Travel'
 import { MoveBudgetSheet } from '../components/MoveBudgetSheet'
-import { destStats, myShare, totals, type DestStats } from '../lib/calc'
+import { destStats, myShare, pendingPayments, totals, type DestStats } from '../lib/calc'
 import { money0, money } from '../lib/format'
 import { dateRange, nights, shortDate } from '../lib/dates'
 import { TRANSPORT, countryLabel, type Destination } from '../lib/types'
@@ -24,6 +24,7 @@ export default function Route() {
   if (!data || !uid) return <Loading />
 
   const stats = destStats(data, uid)
+  const pending = pendingPayments(data, uid)
   const tt = totals(data, uid)
   const isGroup = data.members.length > 1
   const lastEnd = stats.length ? stats[stats.length - 1].dest.end_date : data.trip.start_date
@@ -101,7 +102,7 @@ export default function Route() {
           </div>
         )}
         {stats.map((s, i) => (
-          <Stop key={s.dest.id} s={s} index={i} cost={legCost(s.dest.id)} uid={uid} onEdit={() => nav(`/v/${data.trip.id}/d/${s.dest.id}`)} />
+          <Stop key={s.dest.id} s={s} index={i} cost={legCost(s.dest.id)} uid={uid} onEdit={() => nav(`/v/${data.trip.id}/d/${s.dest.id}`)} pendingCount={pending.filter((e) => e.destination_id === s.dest.id).length} />
         ))}
 
         <div className="tl-connector" style={{ minHeight: 28 }}>
@@ -169,7 +170,7 @@ export default function Route() {
   )
 }
 
-function Stop({ s, index, cost, uid, onEdit }: { s: DestStats; index: number; cost: number; uid: string; onEdit: () => void }) {
+function Stop({ s, index, cost, uid, onEdit, pendingCount }: { s: DestStats; index: number; cost: number; uid: string; onEdit: () => void; pendingCount: number }) {
   const mode = TRANSPORT.find((t) => t.id === s.dest.transport_mode)?.label ?? 'Traslado'
   const cls = s.status === 'current' ? 'current' : s.status === 'past' ? 'past' : ''
   return (
@@ -208,14 +209,20 @@ function Stop({ s, index, cost, uid, onEdit }: { s: DestStats; index: number; co
           ) : s.status === 'upcoming' && s.lodgingTotal === 0 ? (
             <span className="text13 amber">Alojamiento sin reservar · se paga allá, dentro del presupuesto</span>
           ) : null}
-          {s.status !== 'upcoming' && (
+          {(s.status !== 'upcoming' || s.spent > 0) && (
             <span className="text13 ink2">
-              En destino {money(s.spent)} de {money0(s.budget)}
+              {s.status === 'upcoming' ? 'Ya cargado' : 'En destino'} {money(s.spent)} de {money0(s.budget)}
+              {s.status === 'upcoming' && s.budget > 0 && ` · quedan ${money0(Math.max(s.left, 0))}`}
               {s.status === 'past' && s.left > 0 && (
                 <>
                   {' · '}sobraron <strong className="green-text semi">{money0(s.left)}</strong>
                 </>
               )}
+            </span>
+          )}
+          {pendingCount > 0 && (
+            <span className="text13 amber semi">
+              {pendingCount === 1 ? '1 seña' : `${pendingCount} señas`} con saldo pendiente
             </span>
           )}
         </button>
